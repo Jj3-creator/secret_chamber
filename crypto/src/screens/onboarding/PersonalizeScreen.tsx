@@ -7,11 +7,12 @@ import { View, Text, StyleSheet, SafeAreaView, TextInput, Pressable, ScrollView 
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { IconBadge } from '../../components/IconBadge';
+import { ThemedBackground } from '../../components/ThemedBackground';
 import { AVATAR_OPTIONS } from '../../components/avatars';
 import { ROOM_THEMES } from '../../theme/roomThemes';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { saveRoomProfile } from '../../services/localProfile';
+import { useRoomTheme } from '../../theme/RoomThemeContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Personalize'>;
 
@@ -19,10 +20,9 @@ export function PersonalizeScreen({ navigation, route }: Props) {
   const { accountId, kdf } = route.params;
   const [nickname, setNickname] = useState('');
   const [avatarId, setAvatarId] = useState(AVATAR_OPTIONS[0].id);
-  const [themeId, setThemeId] = useState(ROOM_THEMES[0].id);
+  const { themeId, accentColor, backgroundColor, setThemeId } = useRoomTheme();
   const [saving, setSaving] = useState(false);
 
-  const themeColor = ROOM_THEMES.find((t) => t.id === themeId)?.color ?? ROOM_THEMES[0].color;
   const displayName = nickname.trim() || 'คุณ';
 
   const handleContinue = async () => {
@@ -35,7 +35,10 @@ export function PersonalizeScreen({ navigation, route }: Props) {
     }
   };
 
+  const PreviewAvatar = AVATAR_OPTIONS.find((a) => a.id === avatarId)?.Component ?? AVATAR_OPTIONS[0].Component;
+
   return (
+    <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
     <SafeAreaView style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>ตั้งชื่อและหน้าตาห้องของคุณ</Text>
@@ -44,12 +47,7 @@ export function PersonalizeScreen({ navigation, route }: Props) {
         </Text>
 
         <View style={styles.previewCard}>
-          <IconBadge size={56} tint={themeColor}>
-            {(() => {
-              const Avatar = AVATAR_OPTIONS.find((a) => a.id === avatarId)?.Component ?? AVATAR_OPTIONS[0].Component;
-              return <Avatar size={28} color={colors.textPrimary} />;
-            })()}
-          </IconBadge>
+          <PreviewAvatar size={56} />
           <Text style={styles.previewText}>ห้องลับของ{displayName}</Text>
         </View>
 
@@ -73,9 +71,9 @@ export function PersonalizeScreen({ navigation, route }: Props) {
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 onPress={() => setAvatarId(id)}
-                style={[styles.avatarCell, active && styles.avatarCellActive]}
+                style={[styles.avatarCell, active && { borderColor: accentColor, backgroundColor: `${accentColor}1F` }]}
               >
-                <Component size={26} color={colors.textPrimary} />
+                <Component size={40} />
                 <Text style={styles.avatarLabel}>{label}</Text>
               </Pressable>
             );
@@ -103,11 +101,12 @@ export function PersonalizeScreen({ navigation, route }: Props) {
 
       <PrimaryButton label={saving ? 'กำลังบันทึก…' : 'บันทึกและดำเนินต่อ'} onPress={handleContinue} disabled={saving} />
     </SafeAreaView>
+    </ThemedBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg },
+  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg },
   title: { ...typography.title, fontSize: 20, color: colors.textPrimary, marginBottom: spacing.xs },
   subtitle: { ...typography.body, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg },
   previewCard: {
@@ -143,7 +142,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  avatarCellActive: { borderColor: colors.accentTeal, backgroundColor: 'rgba(127,166,177,0.12)' },
   avatarLabel: { ...typography.body, fontSize: 11, color: colors.textSecondary },
   themeRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xl },
   themeSwatchWrapper: { padding: 4 },

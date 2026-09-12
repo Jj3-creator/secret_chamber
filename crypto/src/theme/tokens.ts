@@ -5,7 +5,17 @@
  * dark neutral palette, no bright brand color (intentionally styled to
  * read like a plain file-storage utility, not an obviously "secret" app).
  */
-import type { TextStyle } from 'react-native';
+import { Platform, type TextStyle } from 'react-native';
+
+// Thai script has no spaces between words. Native text layout (iOS/Android)
+// handles that fine, but on web the browser needs dictionary-based
+// segmentation to find a line-break point in an unbroken Thai sentence —
+// and this preview's Chromium build doesn't ship that dictionary, so long
+// text just runs off the edge of the screen instead of wrapping (looks like
+// text is missing/cut off). Force a hard-wrap fallback, web only.
+const webTextWrapFix = (
+  Platform.OS === 'web' ? { overflowWrap: 'anywhere', wordBreak: 'break-word' } : {}
+) as TextStyle;
 
 export const colors = {
   background: '#0B0B0D',
@@ -27,9 +37,9 @@ export const colors = {
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
 
 export const typography: Record<string, TextStyle> = {
-  title: { fontSize: 28, fontWeight: '700' },
-  subtitle: { fontSize: 15, fontWeight: '400', lineHeight: 22 },
-  label: { fontSize: 13, fontWeight: '600', letterSpacing: 0.5 },
-  body: { fontSize: 15, fontWeight: '400' },
-  mono: { fontSize: 16, fontWeight: '600' },
+  title: { fontSize: 28, fontWeight: '700', ...webTextWrapFix },
+  subtitle: { fontSize: 15, fontWeight: '400', lineHeight: 22, ...webTextWrapFix },
+  label: { fontSize: 13, fontWeight: '600', letterSpacing: 0.5, ...webTextWrapFix },
+  body: { fontSize: 15, fontWeight: '400', ...webTextWrapFix },
+  mono: { fontSize: 16, fontWeight: '600', ...webTextWrapFix },
 };

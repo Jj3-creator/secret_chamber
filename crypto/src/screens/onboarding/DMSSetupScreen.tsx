@@ -24,11 +24,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { ThemedBackground } from '../../components/ThemedBackground';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { generateRandomToken, sha256Hex, deriveMasterKey } from '../../services/crypto';
 import { createRecoveryShares, wrapVaultKey } from '../../services/vault';
 import { setupDms } from '../../services/backend';
 import { useOnboarding } from './OnboardingContext';
+import { useRoomTheme } from '../../theme/RoomThemeContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'DMSSetup'>;
 
@@ -51,6 +53,7 @@ interface RevealedGuardian {
 export function DMSSetupScreen({ navigation, route }: Props) {
   const { accountId, kdf } = route.params;
   const { masterKeyHex, clear } = useOnboarding();
+  const { accentColor, backgroundColor } = useRoomTheme();
 
   const [enabled, setEnabled] = useState(false);
   const [periodHours, setPeriodHours] = useState(PERIOD_OPTIONS[1].hours); // 14 days default
@@ -122,6 +125,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
   if (revealed) {
     return (
+      <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
       <SafeAreaView style={styles.container}>
         <ScrollView>
           <Text style={styles.title}>รหัสสำหรับผู้รับแต่ละคน</Text>
@@ -140,10 +144,12 @@ export function DMSSetupScreen({ navigation, route }: Props) {
         </ScrollView>
         <PrimaryButton label="เสร็จสิ้น" onPress={finish} />
       </SafeAreaView>
+      </ThemedBackground>
     );
   }
 
   return (
+    <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
     <SafeAreaView style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>ตั้งค่า Dead Man's Switch (ไม่บังคับ)</Text>
@@ -169,7 +175,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
                     onPress={() => setPeriodHours(opt.hours)}
-                    style={[styles.periodChip, active && styles.periodChipActive]}
+                    style={[styles.periodChip, active && { borderColor: accentColor, backgroundColor: `${accentColor}1F` }]}
                   >
                     <Text style={[styles.periodChipText, active && styles.periodChipTextActive]}>{opt.label}</Text>
                   </Pressable>
@@ -223,11 +229,12 @@ export function DMSSetupScreen({ navigation, route }: Props) {
         )}
       </View>
     </SafeAreaView>
+    </ThemedBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg },
+  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg },
   title: { ...typography.title, fontSize: 19, color: colors.textPrimary, marginBottom: spacing.xs },
   subtitle: { ...typography.body, fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.lg },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xl },

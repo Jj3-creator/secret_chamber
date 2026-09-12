@@ -7,16 +7,30 @@ import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { ThemedBackground } from '../../components/ThemedBackground';
 import { colors, spacing, typography } from '../../theme/tokens';
+import { useRoomTheme } from '../../theme/RoomThemeContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Done'>;
 
 export function DoneScreen({ route, navigation }: Props) {
   const { accountId, kdf } = route.params;
   const [showTechDetails, setShowTechDetails] = useState(false);
+  const { accentColor, backgroundColor } = useRoomTheme();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
+    {/* Padding lives on this inner View, not on SafeAreaView itself — on
+        web, SafeAreaView applies its own safe-area padding-inline CSS
+        that can win the cascade over horizontal padding set directly on
+        the same element (observed: paddingHorizontal silently computed
+        to 0 when set alongside justifyContent on the SafeAreaView here),
+        leaving text flush against the screen edges. Every other screen in
+        this flow puts padding + justifyContent on the SafeAreaView itself
+        with no problem, so this split is a defensive fix scoped to this
+        screen's exact combination rather than a change applied everywhere. */}
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
       <View style={styles.textBlock}>
         <Text style={styles.title}>สร้างห้องลับของคุณสำเร็จแล้ว</Text>
         <Text style={styles.reassurance}>
@@ -24,7 +38,9 @@ export function DoneScreen({ route, navigation }: Props) {
         </Text>
 
         <Pressable onPress={() => setShowTechDetails((v) => !v)} accessibilityRole="button">
-          <Text style={styles.techToggle}>{showTechDetails ? 'ซ่อนรายละเอียดทางเทคนิค' : 'ดูรายละเอียดทางเทคนิค'}</Text>
+          <Text style={[styles.techToggle, { color: accentColor }]}>
+            {showTechDetails ? 'ซ่อนรายละเอียดทางเทคนิค' : 'ดูรายละเอียดทางเทคนิค'}
+          </Text>
         </Pressable>
         {showTechDetails && (
           <View style={styles.techBox}>
@@ -47,12 +63,21 @@ export function DoneScreen({ route, navigation }: Props) {
         label="เข้าห้องลับของฉัน (My Secret Chamber)"
         onPress={() => navigation.navigate('VaultHome', { accountId })}
       />
+      </View>
     </SafeAreaView>
+    </ThemedBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, justifyContent: 'space-between' },
+  safeArea: { flex: 1 },
+  container: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+    justifyContent: 'space-between',
+  },
   textBlock: { flex: 1, justifyContent: 'center' },
   title: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.md },
   reassurance: { ...typography.body, fontSize: 14, color: colors.textSecondary, lineHeight: 21, marginBottom: spacing.xl },

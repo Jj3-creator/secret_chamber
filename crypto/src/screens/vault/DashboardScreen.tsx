@@ -15,8 +15,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { ArrowLeftIcon, ImageStackIcon, ChartIcon } from '../../components/icons';
 import { IconBadge } from '../../components/IconBadge';
+import { ThemedBackground } from '../../components/ThemedBackground';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, getActivityLog, type ActivityLogEntry } from '../../services/backend';
+import { useRoomTheme } from '../../theme/RoomThemeContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Dashboard'>;
 
@@ -56,6 +58,7 @@ export function DashboardScreen({ navigation, route }: Props) {
   const [activity, setActivity] = useState<ActivityLogEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { accentColor, backgroundColor } = useRoomTheme();
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +82,7 @@ export function DashboardScreen({ navigation, route }: Props) {
   const usedFraction = Math.min(1, usedBytes / TOTAL_STORAGE_BYTES);
 
   return (
+    <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" hitSlop={12}>
@@ -100,7 +104,7 @@ export function DashboardScreen({ navigation, route }: Props) {
               <Text style={styles.storageText}>เหลือ {formatMB(TOTAL_STORAGE_BYTES - usedBytes)} MB</Text>
             </View>
             <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${usedFraction * 100}%` }]} />
+              <View style={[styles.progressFill, { width: `${usedFraction * 100}%`, backgroundColor: accentColor }]} />
             </View>
           </View>
 
@@ -120,7 +124,7 @@ export function DashboardScreen({ navigation, route }: Props) {
             const detail = describeEntry(entry);
             return (
               <View key={i} style={styles.activityRow}>
-                <IconBadge size={36}>
+                <IconBadge size={36} tint={accentColor}>
                   <ChartIcon size={16} color={colors.textPrimary} />
                 </IconBadge>
                 <View style={styles.activityTextBlock}>
@@ -136,16 +140,16 @@ export function DashboardScreen({ navigation, route }: Props) {
         </ScrollView>
       )}
     </SafeAreaView>
+    </ThemedBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
+  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
   title: { ...typography.title, fontSize: 18, color: colors.textPrimary },

@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
+import { ThemedBackground } from '../../components/ThemedBackground';
 import {
   type IconProps,
   ImageStackIcon,
@@ -29,7 +30,7 @@ import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, sendHeartbeat, type AccountStatus } from '../../services/backend';
 import { loadRoomProfile, type RoomProfile } from '../../services/localProfile';
 import { getAvatarComponent } from '../../components/avatars';
-import { getRoomThemeColor } from '../../theme/roomThemes';
+import { useRoomTheme } from '../../theme/RoomThemeContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'VaultHome'>;
 
@@ -119,6 +120,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { accentColor, backgroundColor, setThemeId } = useRoomTheme();
 
   const load = useCallback(async () => {
     setError(null);
@@ -129,12 +131,16 @@ export function VaultHomeScreen({ route, navigation }: Props) {
       ]);
       setStatus(accountStatus);
       setProfile(roomProfile);
+      // Restore the saved theme into the shared context — covers opening
+      // this screen fresh (e.g. a future direct re-entry/unlock flow)
+      // rather than relying on Personalize having just set it live.
+      if (roomProfile?.themeId) setThemeId(roomProfile.themeId);
     } catch {
       setError('โหลดสถานะห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
     } finally {
       setLoading(false);
     }
-  }, [accountId]);
+  }, [accountId, setThemeId]);
 
   useEffect(() => {
     load();
@@ -162,17 +168,16 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   const usedFraction = Math.min(1, usedBytes / TOTAL_STORAGE_BYTES);
   const dmsConfigured = status ? status.dmsThresholdHours != null : false;
 
-  const themeColor = getRoomThemeColor(profile?.themeId ?? 'teal');
+  const themeColor = accentColor;
   const Avatar = getAvatarComponent(profile?.avatarId ?? 'cat');
   const roomTitle = profile?.nickname ? `ห้องลับของ${profile.nickname}` : 'ห้องของฉัน';
 
   return (
+    <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <IconBadge size={40} tint={themeColor}>
-            <Avatar size={20} color={colors.textPrimary} />
-          </IconBadge>
+          <Avatar size={40} />
           <Text style={styles.title}>{roomTitle}</Text>
         </View>
         <View style={styles.headerRight}>
@@ -282,19 +287,19 @@ export function VaultHomeScreen({ route, navigation }: Props) {
         </ScrollView>
       )}
     </SafeAreaView>
+    </ThemedBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg },
+  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1, paddingRight: spacing.sm },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { ...typography.title, fontSize: 20, color: colors.textPrimary, flexShrink: 1 },
   loader: { marginTop: spacing.xxl },
@@ -332,7 +337,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: spacing.md,
   },
-  categoryTextBlock: { flex: 1 },
+  categoryTextBlock: { flex: 1, marginRight: spacing.xs },
   safeLabel: { ...typography.label, fontSize: 11, color: colors.accentTeal, marginBottom: 2 },
   categoryName: { ...typography.body, fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   categoryNameEn: { fontWeight: '400', color: colors.textMuted, fontSize: 13 },
