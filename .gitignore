@@ -11,6 +11,10 @@ web-build/
 .env.local
 *.key
 
+# Supabase CLI local cache/state (project ref, pooler url, version pins)
+supabase/.temp/
+supabase/.branches/
+
 # OS cruft
 .DS_Store
 Thumbs.db
