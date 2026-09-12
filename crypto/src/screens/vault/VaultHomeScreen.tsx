@@ -20,7 +20,6 @@ import {
   HeartPulseIcon,
   FeatherIcon,
   LockIcon,
-  LayersIcon,
   GearIcon,
   ChevronRightIcon,
   PlusIcon,
@@ -32,7 +31,9 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'VaultHome'>;
 
 const TOTAL_STORAGE_BYTES = 104_857_600; // 100 MB, matches the backend's get-upload-url cap
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const CUSTOM_SLOT_COUNT = 5; // feedback: give the user a few blank safes to name themselves
+// 5 real categories (Decoy Chamber deliberately excluded — see comment
+// below) + 7 blank custom slots = 12 total ("ครบโหล" per feedback).
+const CUSTOM_SLOT_COUNT = 7;
 
 interface CategoryRow {
   /** Thai name — primary label per feedback (Thai first, English keyword secondary). */
@@ -82,13 +83,14 @@ const CATEGORIES: CategoryRow[] = [
     caption: 'ล็อกซ้อน · ต้องใส่ PIN อีกครั้ง',
     icon: LockIcon,
   },
-  {
-    nameTh: 'ห้องหลอก',
-    nameEn: 'Decoy Chamber',
-    description: 'ไฟล์ธรรมดาจัดไว้ให้ดูสมจริง ใช้เมื่อถูกบังคับให้ปลดล็อก',
-    caption: '12 ไฟล์ · จัดฉากไว้ให้ดู',
-    icon: LayersIcon,
-  },
+  // NO "Decoy Chamber" entry here — on purpose. This screen is what the
+  // REAL PIN unlocks. If the decoy vault showed up as just another row in
+  // this list, anyone who coerces the owner into unlocking the real vault
+  // would immediately see "there's a decoy" and know to demand the other
+  // PIN too — defeating the entire point of having one. Per the design
+  // (screen 2.3, "ผลลัพธ์: DECOY CHAMBER"), the decoy vault is its own
+  // completely separate screen, reachable ONLY by entering the Decoy PIN
+  // at unlock (section 02, not built yet) — never listed inside this one.
 ];
 
 function formatMB(bytes: number): string {
@@ -183,6 +185,10 @@ export function VaultHomeScreen({ route }: Props) {
           <View style={[styles.card, styles.dmsCard]}>
             <View style={styles.dmsTextBlock}>
               <Text style={styles.dmsTitle}>เช็คอินความปลอดภัย</Text>
+              <Text style={styles.dmsExplainer}>
+                กดปุ่มนี้เป็นระยะเพื่อบอกระบบว่า "ฉันยังอยู่" ถ้าคุณหายไปนานเกินกำหนด ระบบจะเริ่มส่งกุญแจของหมวด
+                พินัยกรรม/มรดกข้อมูล ให้ผู้รับที่คุณตั้งไว้
+              </Text>
               <Text style={styles.dmsSubtitle}>{status ? describeDms(status) : ''}</Text>
               {!dmsConfigured && (
                 <Text style={styles.dmsHint}>
@@ -285,6 +291,7 @@ const styles = StyleSheet.create({
   dmsCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dmsTextBlock: { flex: 1, marginRight: spacing.md },
   dmsTitle: { ...typography.body, fontSize: 14, color: colors.textPrimary, marginBottom: 2 },
+  dmsExplainer: { ...typography.body, fontSize: 12, color: colors.textSecondary, marginBottom: 4, lineHeight: 17 },
   dmsSubtitle: { ...typography.body, fontSize: 12, color: colors.textMuted },
   dmsHint: { ...typography.body, fontSize: 11, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' },
   checkinButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minWidth: 88 },

@@ -26,9 +26,11 @@ export function WelcomeScreen({ navigation }: Props) {
         <VaultMarkIcon size={30} color={colors.textPrimary} />
       </IconBadge>
       <View style={styles.textBlock}>
-        <Text style={styles.title}>Secret Chamber</Text>
+        <Text style={styles.title}>ห้องแห่งความลับ</Text>
+        <Text style={styles.titleEn}>Secret Chamber</Text>
         <Text style={styles.subtitle}>
-          พื้นที่เก็บไฟล์ที่เข้ารหัสในเครื่องคุณ ไม่มีบัญชี ไม่มีเซิร์ฟเวอร์ที่อ่านข้อมูลได้
+          แอปนี้เก็บไฟล์ลับของคุณ โดยเข้ารหัสไว้ในมือถือคุณเองเท่านั้น{'\n'}
+          ไม่มีใครเปิดดูได้ — แม้แต่คนสร้างแอปนี้ก็ตาม
         </Text>
 
         <Text style={styles.languageLabel}>ภาษาของกุญแจ 12 คำ (เลือกครั้งเดียวตอนสร้างห้อง)</Text>
@@ -74,7 +76,8 @@ const styles = StyleSheet.create({
   },
   icon: { marginTop: spacing.xxl },
   textBlock: { flex: 1, justifyContent: 'center' },
-  title: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.md },
+  title: { ...typography.title, color: colors.textPrimary, marginBottom: 2 },
+  titleEn: { ...typography.body, fontSize: 14, color: colors.textMuted, marginBottom: spacing.md },
   subtitle: { ...typography.subtitle, color: colors.textSecondary, marginBottom: spacing.xl },
   languageLabel: { ...typography.label, fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
   languageRow: { flexDirection: 'row', gap: spacing.sm },
