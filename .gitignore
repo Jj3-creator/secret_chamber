@@ -12,8 +12,8 @@ web-build/
 *.key
 
 # Supabase CLI local cache/state (project ref, pooler url, version pins)
-supabase/.temp/
-supabase/.branches/
+**/supabase/.temp/
+**/supabase/.branches/
 
 # OS cruft
 .DS_Store
