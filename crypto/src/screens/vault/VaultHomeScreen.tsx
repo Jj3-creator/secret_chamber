@@ -26,6 +26,9 @@ import {
 } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, sendHeartbeat, type AccountStatus } from '../../services/backend';
+import { loadRoomProfile, type RoomProfile } from '../../services/localProfile';
+import { getAvatarComponent } from '../../components/avatars';
+import { getRoomThemeColor } from '../../theme/roomThemes';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'VaultHome'>;
 
@@ -111,6 +114,7 @@ function describeDms(status: AccountStatus): string {
 export function VaultHomeScreen({ route }: Props) {
   const { accountId } = route.params;
   const [status, setStatus] = useState<AccountStatus | null>(null);
+  const [profile, setProfile] = useState<RoomProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +122,12 @@ export function VaultHomeScreen({ route }: Props) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      setStatus(await getAccountStatus(accountId));
+      const [accountStatus, roomProfile] = await Promise.all([
+        getAccountStatus(accountId),
+        loadRoomProfile(accountId),
+      ]);
+      setStatus(accountStatus);
+      setProfile(roomProfile);
     } catch {
       setError('โหลดสถานะห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
     } finally {
@@ -152,10 +161,19 @@ export function VaultHomeScreen({ route }: Props) {
   const usedFraction = Math.min(1, usedBytes / TOTAL_STORAGE_BYTES);
   const dmsConfigured = status ? status.dmsThresholdHours != null : false;
 
+  const themeColor = getRoomThemeColor(profile?.themeId ?? 'teal');
+  const Avatar = getAvatarComponent(profile?.avatarId ?? 'cat');
+  const roomTitle = profile?.nickname ? `ห้องลับของ${profile.nickname}` : 'ห้องของฉัน';
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>ห้องของฉัน</Text>
+        <View style={styles.headerLeft}>
+          <IconBadge size={40} tint={themeColor}>
+            <Avatar size={20} color={colors.textPrimary} />
+          </IconBadge>
+          <Text style={styles.title}>{roomTitle}</Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           onPress={() => Alert.alert('ตั้งค่า', 'หน้าตั้งค่า (section 05) ยังไม่ได้สร้าง')}
@@ -178,7 +196,7 @@ export function VaultHomeScreen({ route }: Props) {
               <Text style={styles.storageText}>เหลือ {formatMB(TOTAL_STORAGE_BYTES - usedBytes)} MB</Text>
             </View>
             <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${usedFraction * 100}%` }]} />
+              <View style={[styles.progressFill, { width: `${usedFraction * 100}%`, backgroundColor: themeColor }]} />
             </View>
           </View>
 
@@ -217,11 +235,11 @@ export function VaultHomeScreen({ route }: Props) {
                     Alert.alert(cat.nameTh, 'หน้ารายการไฟล์ในหมวดนี้ยังไม่ได้สร้าง (section 04 — placeholder)')
                   }
                 >
-                  <IconBadge size={44}>
+                  <IconBadge size={44} tint={themeColor}>
                     <Icon size={22} color={colors.textPrimary} />
                   </IconBadge>
                   <View style={styles.categoryTextBlock}>
-                    <Text style={styles.safeLabel}>ตู้เซฟใบที่ {i + 1}</Text>
+                    <Text style={[styles.safeLabel, { color: themeColor }]}>ตู้เซฟใบที่ {i + 1}</Text>
                     <Text style={styles.categoryName}>
                       {cat.nameTh} <Text style={styles.categoryNameEn}>({cat.nameEn})</Text>
                     </Text>
@@ -268,7 +286,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
-  title: { ...typography.title, fontSize: 24, color: colors.textPrimary },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
+  title: { ...typography.title, fontSize: 20, color: colors.textPrimary, flexShrink: 1 },
   loader: { marginTop: spacing.xxl },
   error: { color: colors.dangerText, marginBottom: spacing.md },
   card: {

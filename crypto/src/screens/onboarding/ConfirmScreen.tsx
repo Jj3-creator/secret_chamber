@@ -51,7 +51,7 @@ export function ConfirmScreen({ navigation }: Props) {
       const { masterKeyHex, kdf } = await deriveMasterKey(passphrase);
       const accountId = deriveAccountId(masterKeyHex);
       clear(); // done with the passphrase — drop it from memory now
-      navigation.navigate('Done', { accountId, kdf });
+      navigation.navigate('Personalize', { accountId, kdf });
     } finally {
       setBusy(false);
     }

@@ -16,6 +16,7 @@ Kept in its own folder, independent of [`backend`](../backend) (Part 2).
 - [`src/components/icons/`](src/components/icons), [`src/components/IconBadge.tsx`](src/components/IconBadge.tsx) — hand-drawn line icons (`react-native-svg`) in a soft gradient badge (`expo-linear-gradient`). Added after feedback that the empty bordered-square placeholders read as too stark/empty ("looks like a funeral") — real icons + a subtle glow give depth without breaking the design's deliberately plain, camouflaged tone.
 - [`src/services/backend.ts`](src/services/backend.ts) — thin `fetch` client for the deployed backend (Part 2): reads an account's own row via PostgREST + RLS, and calls `dms-heartbeat`.
 - [`src/services/wordlists/thai.ts`](src/services/wordlists/thai.ts) — a custom 2048-word Thai wordlist (BIP-39 has no official one) — see "Passphrase language" below.
+- [`src/screens/onboarding/PersonalizeScreen.tsx`](src/screens/onboarding/PersonalizeScreen.tsx), [`src/services/localProfile.ts`](src/services/localProfile.ts), [`src/components/avatars/`](src/components/avatars) — nickname + avatar + room-color personalization, stored **on-device only** (`AsyncStorage`, keyed by account_id) — see "Personalization" below.
 - [`src/polyfills.ts`](src/polyfills.ts) — must stay the first import in `App.tsx` (see "A real bug this caught" below).
 
 Tests: [`crypto.test.ts`](src/services/__tests__/crypto.test.ts), [`shamir.test.ts`](src/services/__tests__/shamir.test.ts), [`vault.test.ts`](src/services/__tests__/vault.test.ts), [`thai-wordlist.test.ts`](src/services/__tests__/thai-wordlist.test.ts) — 45 tests total. Plus an opt-in [`live-integration.test.ts`](src/services/__tests__/live-integration.test.ts) against the real deployed backend (see its header comment).
@@ -57,6 +58,27 @@ the app stores nothing and isn't responsible for leaks from the user
 copying/printing/screenshotting the passphrase elsewhere — printed onto
 the backup sheet itself too. The Warning screen's middle checkbox was
 reworded to match (own-risk acknowledgment instead of a photo/cloud ban).
+
+## Personalization (nickname, avatar, room theme)
+
+Not part of the original design — added per feedback: "มี element ให้เลือก
+ใส่รูป avatar ... และ theme ห้อง". A new screen between Confirm and Done
+lets the owner pick a nickname, one of 6 line-art animal/flower avatars
+([`components/avatars/`](src/components/avatars)), and one of 5 accent
+colors ([`theme/roomThemes.ts`](src/theme/roomThemes.ts)). Saved via
+[`localProfile.ts`](src/services/localProfile.ts) — `AsyncStorage`,
+keyed by `account_id`, **never sent to the server** (a nickname is
+exactly the kind of identifying detail the zero-knowledge, no-PII design
+has no business collecting). VaultHome then shows "ห้องลับของ{nickname}"
+with the chosen avatar + accent color instead of the generic "ห้องของฉัน".
+
+**Not done as part of this pass** (flagged, not started — see the four
+open feature areas noted in git history/PR discussion around this
+commit): SMS/LINE emergency-contact notifications (needs a third-party
+provider + API keys from the project owner), 1-year auto-delete +
+PDPA-consent text (auto-delete is buildable; the legal wording needs a
+lawyer's review before relying on it), and a usage/activity dashboard
+(needs new per-category + access-log backend schema).
 
 ## Onboarding screens (screens 1.1–1.4 of the design)
 
