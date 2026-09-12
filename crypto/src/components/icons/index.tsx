@@ -178,3 +178,37 @@ export function ArrowLeftIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** A physical key — decorative element for the guardian/DMS setup screen. */
+export function KeyIcon(props: IconProps) {
+  const { size, color, strokeWidth } = base(props);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={7} cy={7} r={3.5} stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M9.5 9.5 19 19M15.5 15.5l2-2M18 18l2-2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** Filled check inside a circle — used for a check-in that just succeeded. */
+export function CheckCircleIcon(props: IconProps) {
+  const { size, color, strokeWidth } = base(props);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M7.5 12.5 10.5 15.5 16.5 9" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** Closed padlock with a shackle — "lock this room" (exit) action. */
+export function LockClosedIcon(props: IconProps) {
+  const { size, color, strokeWidth } = base(props);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={5} y={10.5} width={14} height={9.5} rx={2} stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <Path d="M12 14.2v2.6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}

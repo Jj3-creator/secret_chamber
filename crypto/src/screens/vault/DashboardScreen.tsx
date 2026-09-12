@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   storageRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
-  storageText: { ...typography.body, fontSize: 13, color: colors.textSecondary },
+  storageText: { ...typography.body, fontSize: 15, color: colors.textSecondary },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: colors.accentTeal, borderRadius: 3 },
   noteBox: {
@@ -182,9 +182,9 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.xl,
   },
-  noteText: { ...typography.body, fontSize: 12, color: colors.textMuted, flex: 1, lineHeight: 17 },
-  sectionLabel: { ...typography.label, fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
-  emptyText: { ...typography.body, fontSize: 13, color: colors.textMuted, fontStyle: 'italic', marginBottom: spacing.lg },
+  noteText: { ...typography.body, fontSize: 16, color: colors.textMuted, flex: 1, lineHeight: 17 },
+  sectionLabel: { ...typography.label, fontSize: 16, color: colors.textMuted, marginBottom: spacing.sm },
+  emptyText: { ...typography.body, fontSize: 15, color: colors.textMuted, fontStyle: 'italic', marginBottom: spacing.lg },
   activityRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -194,6 +194,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   activityTextBlock: { flex: 1 },
-  activityLabel: { ...typography.body, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  activityTime: { ...typography.body, fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  activityLabel: { ...typography.body, fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  activityTime: { ...typography.body, fontSize: 16, color: colors.textMuted, marginTop: 2 },
 });

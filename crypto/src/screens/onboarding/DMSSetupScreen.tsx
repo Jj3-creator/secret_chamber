@@ -19,12 +19,15 @@
 // that unwraps their share. Knowing the token is sufficient and necessary;
 // nothing else to set up on the guardian's side.
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, Pressable, ScrollView, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, Pressable, ScrollView, Switch } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ThemedBackground } from '../../components/ThemedBackground';
+import { IconBadge } from '../../components/IconBadge';
+import { KeyIcon } from '../../components/icons';
+import { appAlert } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { generateRandomToken, sha256Hex, deriveMasterKey } from '../../services/crypto';
 import { createRecoveryShares, wrapVaultKey } from '../../services/vault';
@@ -93,12 +96,12 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
   const handleSetup = async () => {
     if (!masterKeyHex) {
-      Alert.alert('ผิดพลาด', 'ไม่พบกุญแจสำหรับตั้งค่า — ลองเริ่มใหม่จากขั้นตอนสร้างห้อง');
+      appAlert('ผิดพลาด', 'ไม่พบกุญแจสำหรับตั้งค่า — ลองเริ่มใหม่จากขั้นตอนสร้างห้อง');
       return;
     }
     const names = guardianNames.map((n) => n.trim());
     if (names.some((n) => !n) || names.length < MIN_GUARDIANS) {
-      Alert.alert('กรอกไม่ครบ', `ใส่ชื่อผู้ถือกุญแจสำรองอย่างน้อย ${MIN_GUARDIANS} คน`);
+      appAlert('กรอกไม่ครบ', `ใส่ชื่อผู้ถือกุญแจสำรองอย่างน้อย ${MIN_GUARDIANS} คน`);
       return;
     }
 
@@ -138,7 +141,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
       // instead of a generic string — a silent "try again" here is exactly
       // what made the 1-guardian backend-vs-client mismatch hard to see.
       const reason = err instanceof Error ? err.message : String(err);
-      Alert.alert('ตั้งค่าไม่สำเร็จ', `ลองใหม่อีกครั้ง\n\n${reason}`);
+      appAlert('ตั้งค่าไม่สำเร็จ', `ลองใหม่อีกครั้ง\n\n${reason}`);
     } finally {
       setSubmitting(false);
     }
@@ -146,7 +149,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
   const handleCopyToken = async (token: string) => {
     await Clipboard.setStringAsync(token);
-    Alert.alert('คัดลอกแล้ว', 'ส่งรหัสนี้ให้ผู้รับด้วยตัวเอง (นอกแอป) แล้วลบออกจากคลิปบอร์ดของคุณ');
+    appAlert('คัดลอกแล้ว', 'ส่งรหัสนี้ให้ผู้รับด้วยตัวเอง (นอกแอป) แล้วลบออกจากคลิปบอร์ดของคุณ');
   };
 
   if (revealed) {
@@ -184,6 +187,9 @@ export function DMSSetupScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safeArea}>
     <View style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
+        <IconBadge size={56} tint={accentColor} style={styles.headerIcon}>
+          <KeyIcon size={28} color={colors.textPrimary} />
+        </IconBadge>
         <Text style={styles.title}>กุญแจไขความลับสำหรับทายาท (ไม่บังคับ)</Text>
         <Text style={styles.subtitle}>
           กุญแจนี้จะถูกส่งให้คนที่คุณระบุตัวตนไว้ (ทายาท/คนที่คุณไว้ใจ) ก็ต่อเมื่อห้องของคุณขาดการเช็คอินเกินเวลาที่คุณกำหนด
@@ -297,14 +303,15 @@ const styles = StyleSheet.create({
   // leaving content flush against the screen edges. Splitting the two
   // elements sidesteps the conflict regardless of insertion order.
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
+  headerIcon: { marginBottom: spacing.md },
   title: { ...typography.title, fontSize: 19, color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.lg },
+  subtitle: { ...typography.body, fontSize: 15, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.lg },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xl },
   toggleLabel: { ...typography.body, fontSize: 15, color: colors.textPrimary },
-  fieldLabel: { ...typography.label, fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
+  fieldLabel: { ...typography.label, fontSize: 16, color: colors.textMuted, marginBottom: spacing.sm },
   periodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
-  periodExplainer: { ...typography.body, fontSize: 12, color: colors.textMuted, lineHeight: 17, marginBottom: spacing.lg },
-  notifyCaveat: { ...typography.body, fontSize: 11, color: colors.textMuted, fontStyle: 'italic', lineHeight: 16, marginBottom: spacing.lg },
+  periodExplainer: { ...typography.body, fontSize: 16, color: colors.textMuted, lineHeight: 17, marginBottom: spacing.lg },
+  notifyCaveat: { ...typography.body, fontSize: 16, color: colors.textMuted, fontStyle: 'italic', lineHeight: 16, marginBottom: spacing.lg },
   warnBox: {
     borderWidth: 1,
     borderColor: colors.dangerBorder,
@@ -313,10 +320,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  warnText: { ...typography.body, fontSize: 12, color: colors.dangerText, lineHeight: 18 },
+  warnText: { ...typography.body, fontSize: 16, color: colors.dangerText, lineHeight: 18 },
   periodChip: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   periodChipActive: { borderColor: colors.accentTeal, backgroundColor: 'rgba(127,166,177,0.12)' },
-  periodChipText: { ...typography.body, fontSize: 13, color: colors.textSecondary },
+  periodChipText: { ...typography.body, fontSize: 15, color: colors.textSecondary },
   periodChipTextActive: { color: colors.textPrimary, fontWeight: '600' },
   guardianRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm, alignItems: 'center' },
   input: {
@@ -330,14 +337,14 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
   removeButton: { paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
-  removeButtonText: { ...typography.body, fontSize: 13, color: colors.dangerText },
+  removeButtonText: { ...typography.body, fontSize: 15, color: colors.dangerText },
   addLink: { marginBottom: spacing.lg },
-  addLinkText: { ...typography.body, fontSize: 14, color: colors.accentTeal },
+  addLinkText: { ...typography.body, fontSize: 16, color: colors.accentTeal },
   noteBox: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: spacing.md, marginBottom: spacing.lg },
-  noteText: { ...typography.body, fontSize: 12, color: colors.textMuted, lineHeight: 18 },
+  noteText: { ...typography.body, fontSize: 16, color: colors.textMuted, lineHeight: 18 },
   footer: { gap: spacing.sm },
   skipLink: { alignItems: 'center', paddingVertical: spacing.sm },
-  skipLinkText: { ...typography.body, fontSize: 13, color: colors.textMuted },
+  skipLinkText: { ...typography.body, fontSize: 15, color: colors.textMuted },
   tokenCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -347,7 +354,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     gap: spacing.sm,
   },
-  tokenNickname: { ...typography.body, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  tokenLabel: { ...typography.label, fontSize: 11, color: colors.textMuted, marginTop: -4 },
-  tokenValue: { ...typography.mono, fontSize: 12, color: colors.textSecondary },
+  tokenNickname: { ...typography.body, fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  tokenLabel: { ...typography.label, fontSize: 16, color: colors.textMuted, marginTop: -4 },
+  tokenValue: { ...typography.mono, fontSize: 16, color: colors.textSecondary },
 });

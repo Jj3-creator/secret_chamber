@@ -1,12 +1,13 @@
 // Screen 1.3 — 12-WORD PASSPHRASE
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Print from 'expo-print';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { appAlert } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { generatePassphrase } from '../../services/crypto';
 import { useOnboarding } from './OnboardingContext';
@@ -71,7 +72,7 @@ export function PassphraseScreen({ navigation }: Props) {
   const handleCopy = async () => {
     if (!words) return;
     await Clipboard.setStringAsync(words.join(' '));
-    Alert.alert('คัดลอกแล้ว', 'คัดลอก 12 คำไปยังคลิปบอร์ดแล้ว — ล้างคลิปบอร์ดเองหลังนำไปเก็บที่ปลอดภัย');
+    appAlert('คัดลอกแล้ว', 'คัดลอก 12 คำไปยังคลิปบอร์ดแล้ว — ล้างคลิปบอร์ดเองหลังนำไปเก็บที่ปลอดภัย');
   };
 
   const handlePrint = async () => {
@@ -79,7 +80,7 @@ export function PassphraseScreen({ navigation }: Props) {
     try {
       await Print.printAsync({ html: buildBackupSheetHtml(words) });
     } catch {
-      Alert.alert('พิมพ์ไม่สำเร็จ', 'อุปกรณ์นี้ไม่รองรับการพิมพ์ ลองใช้ปุ่มคัดลอกแทน');
+      appAlert('พิมพ์ไม่สำเร็จ', 'อุปกรณ์นี้ไม่รองรับการพิมพ์ ลองใช้ปุ่มคัดลอกแทน');
     }
   };
 
@@ -145,7 +146,7 @@ const styles = StyleSheet.create({
   // the identical comment in DoneScreen.tsx for why.
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   title: { ...typography.title, fontSize: 22, color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { ...typography.subtitle, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg },
+  subtitle: { ...typography.subtitle, fontSize: 15, color: colors.textSecondary, marginBottom: spacing.lg },
   grid: { marginBottom: spacing.md },
   gridRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   wordCell: {
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
   },
-  wordIndex: { ...typography.label, color: colors.textMuted, fontSize: 12 },
+  wordIndex: { ...typography.label, color: colors.textMuted, fontSize: 16 },
   wordText: { ...typography.mono, color: colors.textPrimary },
   revealButton: { marginBottom: spacing.sm },
   actionsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
@@ -173,5 +174,5 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  disclaimerText: { ...typography.body, fontSize: 12, color: colors.dangerText, lineHeight: 18 },
+  disclaimerText: { ...typography.body, fontSize: 16, color: colors.dangerText, lineHeight: 18 },
 });

@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   // the identical comment in DoneScreen.tsx for why.
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   title: { ...typography.title, fontSize: 22, color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { ...typography.subtitle, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg },
+  subtitle: { ...typography.subtitle, fontSize: 15, color: colors.textSecondary, marginBottom: spacing.lg },
   field: { marginBottom: spacing.lg },
   fieldLabel: { ...typography.label, color: colors.textMuted, marginBottom: spacing.xs },
   input: {
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
   },
-  suggestionText: { ...typography.body, fontSize: 13, color: colors.textPrimary },
+  suggestionText: { ...typography.body, fontSize: 15, color: colors.textPrimary },
   error: { color: colors.dangerText, marginBottom: spacing.md },
-  footnote: { ...typography.body, fontSize: 12, color: colors.textMuted, marginBottom: spacing.lg },
+  footnote: { ...typography.body, fontSize: 16, color: colors.textMuted, marginBottom: spacing.lg },
 });

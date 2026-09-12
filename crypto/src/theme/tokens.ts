@@ -21,10 +21,15 @@ export const colors = {
   background: '#0B0B0D',
   surface: '#17171B',
   surfaceAlt: '#1F1F24',
-  border: '#2A2A30',
+  // Feedback: borders (checkbox boxes especially) were nearly invisible
+  // against the near-black background — too low-contrast to notice,
+  // let alone for an older user to read reliably. Brightened from #2A2A30.
+  border: '#48484F',
   textPrimary: '#F2F2F0',
   textSecondary: '#9B9BA3',
-  textMuted: '#6B6B75',
+  // Brightened from #6B6B75 for the same reason — "muted" shouldn't mean
+  // "hard to read" for hint/caption text that still carries real content.
+  textMuted: '#94949E',
   accent: '#E7E5DF',
   accentText: '#111114',
   /** Muted teal — used for status/progress indicators (storage bar, DMS check-in), sampled from the design canvas export. */
@@ -36,10 +41,14 @@ export const colors = {
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
 
+// Feedback: text was too small/low-contrast for older users to read
+// comfortably — bumped every base size to at least 16px (system font,
+// no license concerns). Screens that explicitly overrode a smaller size
+// were bumped the same way at their own call sites.
 export const typography: Record<string, TextStyle> = {
   title: { fontSize: 28, fontWeight: '700', ...webTextWrapFix },
-  subtitle: { fontSize: 15, fontWeight: '400', lineHeight: 22, ...webTextWrapFix },
-  label: { fontSize: 13, fontWeight: '600', letterSpacing: 0.5, ...webTextWrapFix },
-  body: { fontSize: 15, fontWeight: '400', ...webTextWrapFix },
+  subtitle: { fontSize: 16, fontWeight: '400', lineHeight: 23, ...webTextWrapFix },
+  label: { fontSize: 16, fontWeight: '600', letterSpacing: 0.5, ...webTextWrapFix },
+  body: { fontSize: 16, fontWeight: '400', ...webTextWrapFix },
   mono: { fontSize: 16, fontWeight: '600', ...webTextWrapFix },
 };

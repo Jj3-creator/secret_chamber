@@ -80,8 +80,8 @@ const styles = StyleSheet.create({
   },
   textBlock: { flex: 1, justifyContent: 'center' },
   title: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.md },
-  reassurance: { ...typography.body, fontSize: 14, color: colors.textSecondary, lineHeight: 21, marginBottom: spacing.xl },
-  techToggle: { ...typography.body, fontSize: 13, color: colors.accentTeal, marginBottom: spacing.md },
+  reassurance: { ...typography.body, fontSize: 16, color: colors.textSecondary, lineHeight: 21, marginBottom: spacing.xl },
+  techToggle: { ...typography.body, fontSize: 15, color: colors.accentTeal, marginBottom: spacing.md },
   techBox: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -90,13 +90,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.xl,
   },
-  techLabel: { ...typography.body, fontSize: 12, color: colors.textMuted, marginBottom: 4 },
-  techValue: { ...typography.mono, fontSize: 13, color: colors.textPrimary, marginBottom: spacing.sm },
+  techLabel: { ...typography.body, fontSize: 16, color: colors.textMuted, marginBottom: 4 },
+  techValue: { ...typography.mono, fontSize: 15, color: colors.textPrimary, marginBottom: spacing.sm },
   placeholderBox: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
     padding: spacing.md,
   },
-  placeholderText: { ...typography.body, fontSize: 12, color: colors.textMuted, fontStyle: 'italic' },
+  placeholderText: { ...typography.body, fontSize: 16, color: colors.textMuted, fontStyle: 'italic' },
 });

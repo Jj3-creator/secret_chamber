@@ -15,10 +15,11 @@
 // wired in here; this screen only solves "remember one short thing
 // instead of 12 words", which is what was actually asked for.
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { appAlert } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { derivePinKey, wrapVaultKey } from '../../services/vault';
 import { saveDeviceLock } from '../../services/deviceLock';
@@ -42,15 +43,15 @@ export function SetPinScreen({ navigation, route }: Props) {
 
   const handleSetPin = async () => {
     if (!masterKeyHex) {
-      Alert.alert('ผิดพลาด', 'ไม่พบกุญแจสำหรับตั้งค่า — ลองเริ่มใหม่จากขั้นตอนสร้างห้อง');
+      appAlert('ผิดพลาด', 'ไม่พบกุญแจสำหรับตั้งค่า — ลองเริ่มใหม่จากขั้นตอนสร้างห้อง');
       return;
     }
     if (pin.length < MIN_PIN_LENGTH) {
-      Alert.alert('สั้นเกินไป', `PIN ต้องมีอย่างน้อย ${MIN_PIN_LENGTH} ตัวอักษร`);
+      appAlert('สั้นเกินไป', `PIN ต้องมีอย่างน้อย ${MIN_PIN_LENGTH} ตัวอักษร`);
       return;
     }
     if (pin !== confirmPin) {
-      Alert.alert('ไม่ตรงกัน', 'PIN ทั้งสองช่องต้องเหมือนกัน');
+      appAlert('ไม่ตรงกัน', 'PIN ทั้งสองช่องต้องเหมือนกัน');
       return;
     }
 
@@ -68,7 +69,7 @@ export function SetPinScreen({ navigation, route }: Props) {
       goNext();
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      Alert.alert('ตั้งค่าไม่สำเร็จ', `ลองใหม่อีกครั้ง\n\n${reason}`);
+      appAlert('ตั้งค่าไม่สำเร็จ', `ลองใหม่อีกครั้ง\n\n${reason}`);
     } finally {
       setSubmitting(false);
     }
@@ -130,8 +131,8 @@ const styles = StyleSheet.create({
   // the identical comment in DoneScreen.tsx for why.
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
   title: { ...typography.title, fontSize: 22, color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.xl },
-  fieldLabel: { ...typography.label, fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
+  subtitle: { ...typography.body, fontSize: 15, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.xl },
+  fieldLabel: { ...typography.label, fontSize: 16, color: colors.textMuted, marginBottom: spacing.sm },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

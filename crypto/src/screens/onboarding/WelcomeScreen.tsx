@@ -1,10 +1,11 @@
 // Screen 1.1 — WELCOME
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
+import { appAlert } from '../../components/AppAlert';
 import { VaultMarkIcon } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { useOnboarding } from './OnboardingContext';
@@ -61,7 +62,7 @@ export function WelcomeScreen({ navigation }: Props) {
         <Pressable
           style={styles.recoverLink}
           accessibilityRole="button"
-          onPress={() => Alert.alert('กู้คืนด้วย 12 คำ', 'หน้ากู้คืน (section 02) ยังไม่ได้สร้าง')}
+          onPress={() => appAlert('กู้คืนด้วย 12 คำ', 'หน้ากู้คืน (section 02) ยังไม่ได้สร้าง')}
         >
           <Text style={styles.recoverLinkText}>กู้คืนด้วย 12 คำ</Text>
         </Pressable>
@@ -89,9 +90,9 @@ const styles = StyleSheet.create({
   icon: { marginBottom: spacing.lg },
   spacer: { flex: 1, minHeight: spacing.lg },
   title: { ...typography.title, color: colors.textPrimary, marginBottom: 2 },
-  titleEn: { ...typography.body, fontSize: 14, color: colors.textMuted, marginBottom: spacing.md },
+  titleEn: { ...typography.body, fontSize: 16, color: colors.textMuted, marginBottom: spacing.md },
   subtitle: { ...typography.subtitle, color: colors.textSecondary, marginBottom: spacing.xl },
-  languageLabel: { ...typography.label, fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
+  languageLabel: { ...typography.label, fontSize: 16, color: colors.textMuted, marginBottom: spacing.sm },
   languageRow: { flexDirection: 'row', gap: spacing.sm },
   languageChip: {
     borderWidth: 1,
@@ -101,9 +102,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   languageChipActive: { borderColor: colors.accentTeal, backgroundColor: 'rgba(127,166,177,0.12)' },
-  languageChipText: { ...typography.body, fontSize: 14, color: colors.textSecondary },
+  languageChipText: { ...typography.body, fontSize: 16, color: colors.textSecondary },
   languageChipTextActive: { color: colors.textPrimary, fontWeight: '600' },
   recoverLink: { alignItems: 'center', paddingVertical: spacing.md },
-  recoverLinkText: { ...typography.body, fontSize: 14, color: colors.accentTeal },
-  footnote: { ...typography.body, fontSize: 12, color: colors.textMuted, textAlign: 'center' },
+  recoverLinkText: { ...typography.body, fontSize: 16, color: colors.accentTeal },
+  footnote: { ...typography.body, fontSize: 16, color: colors.textMuted, textAlign: 'center' },
 });

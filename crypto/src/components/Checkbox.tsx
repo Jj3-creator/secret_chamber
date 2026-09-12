@@ -26,16 +26,18 @@ export function Checkbox({ checked, onToggle, label }: Props) {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md },
   box: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    // Feedback: the tick box's border was so thin/low-contrast it was
+    // hard to even see there was a box to tap. Bigger, thicker, brighter.
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: colors.textMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
   },
   boxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
-  check: { fontSize: 13, color: colors.accentText, fontWeight: '700' },
+  check: { fontSize: 17, color: colors.accentText, fontWeight: '700' },
   label: { ...typography.body, color: colors.textSecondary, flex: 1 },
 });

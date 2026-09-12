@@ -4,11 +4,12 @@
 // words. This is the other half of "จำ password แค่ตัวเดียวได้ไม๊" —
 // SetPinScreen creates the lock, this screen consumes it.
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ThemedBackground } from '../../components/ThemedBackground';
+import { appAlert } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { derivePinKey, unwrapVaultKey } from '../../services/vault';
 import { loadDeviceLock, type DeviceLock } from '../../services/deviceLock';
@@ -74,7 +75,7 @@ export function UnlockScreen({ navigation }: Props) {
   };
 
   const handleForgotPin = () => {
-    Alert.alert(
+    appAlert(
       'ลืม PIN?',
       'หน้ากู้คืนด้วย 12 คำจากเครื่องนี้ยังไม่ได้สร้าง (section 02) — ตอนนี้ยังไม่มีทางกู้คืน PIN ได้ในแอป'
     );
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
   spacerTop: { flex: 1, minHeight: spacing.lg },
   header: { alignItems: 'center', marginBottom: spacing.xl },
   title: { ...typography.title, fontSize: 20, color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' },
-  subtitle: { ...typography.body, fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs },
+  subtitle: { ...typography.body, fontSize: 15, color: colors.textSecondary, marginTop: spacing.xs },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -155,8 +156,8 @@ const styles = StyleSheet.create({
     ...typography.mono,
     fontSize: 20,
   },
-  error: { ...typography.body, fontSize: 12, color: colors.dangerText, marginBottom: spacing.md, textAlign: 'center' },
+  error: { ...typography.body, fontSize: 16, color: colors.dangerText, marginBottom: spacing.md, textAlign: 'center' },
   forgotLink: { alignItems: 'center', paddingVertical: spacing.md },
-  forgotLinkText: { ...typography.body, fontSize: 13, color: colors.textMuted },
+  forgotLinkText: { ...typography.body, fontSize: 15, color: colors.textMuted },
   spacerBottom: { flex: 2, minHeight: spacing.lg },
 });

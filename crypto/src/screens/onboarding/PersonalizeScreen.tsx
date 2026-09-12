@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   // the identical comment in DoneScreen.tsx for why.
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
   title: { ...typography.title, fontSize: 20, color: colors.textPrimary, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg },
+  subtitle: { ...typography.body, fontSize: 15, color: colors.textSecondary, marginBottom: spacing.lg },
   previewCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   previewText: { ...typography.body, fontSize: 16, fontWeight: '600', color: colors.textPrimary },
-  fieldLabel: { ...typography.label, fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
+  fieldLabel: { ...typography.label, fontSize: 16, color: colors.textMuted, marginBottom: spacing.sm },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  avatarLabel: { ...typography.body, fontSize: 11, color: colors.textSecondary },
+  avatarLabel: { ...typography.body, fontSize: 16, color: colors.textSecondary },
   themeRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xl },
   themeSwatchWrapper: { padding: 4 },
   themeSwatch: { width: 32, height: 32, borderRadius: 16 },

@@ -8,12 +8,13 @@
 // example numbers. Tapping one shows a placeholder alert rather than a
 // real file list (section 04, "Upload / View item", isn't built yet).
 import React, { useCallback, useEffect, useState, type ComponentType } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
 import { ThemedBackground } from '../../components/ThemedBackground';
+import { appAlert, appConfirm } from '../../components/AppAlert';
 import {
   type IconProps,
   ImageStackIcon,
@@ -25,10 +26,14 @@ import {
   ChartIcon,
   ChevronRightIcon,
   PlusIcon,
+  CheckCircleIcon,
+  LockClosedIcon,
 } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, sendHeartbeat, type AccountStatus } from '../../services/backend';
 import { loadRoomProfile, type RoomProfile } from '../../services/localProfile';
+import { recordCheckin, loadCheckinLog, type CheckinLog } from '../../services/checkinLog';
+import { loadDeviceLock } from '../../services/deviceLock';
 import { getAvatarComponent } from '../../components/avatars';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
 
@@ -102,6 +107,14 @@ function formatMB(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1);
 }
 
+function formatThaiDateTime(iso: string): string {
+  const d = new Date(iso);
+  const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${hh}:${mm}`;
+}
+
 function describeDms(status: AccountStatus): string {
   if (status.dmsThresholdHours == null || status.dmsHeartbeatAt == null) {
     return 'ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท';
@@ -117,6 +130,8 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   const { accountId } = route.params;
   const [status, setStatus] = useState<AccountStatus | null>(null);
   const [profile, setProfile] = useState<RoomProfile | null>(null);
+  const [checkinLog, setCheckinLog] = useState<CheckinLog | null>(null);
+  const [justCheckedIn, setJustCheckedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,12 +140,14 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [accountStatus, roomProfile] = await Promise.all([
+      const [accountStatus, roomProfile, log] = await Promise.all([
         getAccountStatus(accountId),
         loadRoomProfile(accountId),
+        loadCheckinLog(accountId),
       ]);
       setStatus(accountStatus);
       setProfile(roomProfile);
+      setCheckinLog(log);
       // Restore the saved theme into the shared context — covers opening
       // this screen fresh (e.g. a future direct re-entry/unlock flow)
       // rather than relying on Personalize having just set it live.
@@ -154,11 +171,20 @@ export function VaultHomeScreen({ route, navigation }: Props) {
         setStatus((prev) =>
           prev ? { ...prev, dmsHeartbeatAt: result.dmsHeartbeatAt, dmsThresholdHours: result.dmsThresholdHours } : prev
         );
+        // Feedback: the countdown text often reads identical before and
+        // after a successful check-in (it just resets to the same
+        // starting value, e.g. "ครบกำหนดอีก 14 วัน" both times), so
+        // pressing the button looked like it did nothing. This local
+        // counter + timestamp always visibly changes.
+        const log = await recordCheckin(accountId);
+        setCheckinLog(log);
+        setJustCheckedIn(true);
+        setTimeout(() => setJustCheckedIn(false), 2500);
       } else {
-        Alert.alert('เช็คอิน', 'บัญชีนี้ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท');
+        appAlert('เช็คอิน', 'บัญชีนี้ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท');
       }
     } catch {
-      Alert.alert('เช็คอิน', 'เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง');
+      appAlert('เช็คอิน', 'เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง');
     } finally {
       setCheckingIn(false);
     }
@@ -171,6 +197,26 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   const themeColor = accentColor;
   const Avatar = getAvatarComponent(profile?.avatarId ?? 'cat');
   const roomTitle = profile?.nickname ? `ห้องลับของ${profile.nickname}` : 'ห้องของฉัน';
+
+  // Feedback: there should be a way to explicitly close the room on
+  // exit, with one more reminder that nobody — including the app's own
+  // creator — can recover anything if the owner loses their own PIN/12
+  // words. Re-locks to the PIN screen if this device has one set up
+  // (SetPinScreen), otherwise all the way back to Welcome.
+  const handleLockRoom = () => {
+    appConfirm(
+      'ปิดห้องลับ',
+      'คำเตือนอีกครั้ง: แอปนี้ ผู้ดูแล/ผู้สร้างแอป ไม่สามารถดึงหรือกู้ข้อมูลใดๆ ให้ท่านได้ทั้งนั้น ท่านต้องเก็บรักษา PIN และ 12 คำด้วยตัวเองอย่างระมัดระวัง',
+      async () => {
+        const lock = await loadDeviceLock();
+        navigation.reset({
+          index: 0,
+          routes: [lock ? { name: 'Unlock' } : { name: 'Welcome' }],
+        });
+      },
+      { confirmText: 'ปิดห้อง', cancelText: 'ยกเลิก' }
+    );
+  };
 
   return (
     <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
@@ -189,10 +235,15 @@ export function VaultHomeScreen({ route, navigation }: Props) {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            onPress={() => Alert.alert('ตั้งค่า', 'หน้าตั้งค่า (section 05) ยังไม่ได้สร้าง')}
+            onPress={() => appAlert('ตั้งค่า', 'หน้าตั้งค่า (section 05) ยังไม่ได้สร้าง')}
           >
             <IconBadge size={40}>
               <GearIcon size={20} color={colors.textPrimary} />
+            </IconBadge>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={handleLockRoom}>
+            <IconBadge size={40}>
+              <LockClosedIcon size={19} color={colors.textPrimary} />
             </IconBadge>
           </Pressable>
         </View>
@@ -222,19 +273,31 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                 พินัยกรรม/มรดกข้อมูล ให้ผู้ถือกุญแจสำรองที่คุณตั้งไว้
               </Text>
               <Text style={styles.dmsSubtitle}>{status ? describeDms(status) : ''}</Text>
+              {checkinLog && (
+                <Text style={styles.checkinLogText}>
+                  เช็คอินครั้งที่ {checkinLog.count} — ล่าสุด {formatThaiDateTime(checkinLog.lastCheckinAt)}
+                </Text>
+              )}
               {!dmsConfigured && (
                 <Text style={styles.dmsHint}>
                   ปุ่มนี้จะกดได้เมื่อตั้งค่ากุญแจไขความลับสำหรับทายาทแล้ว (หน้าตั้งค่ายังไม่ได้สร้าง)
                 </Text>
               )}
             </View>
-            <PrimaryButton
-              variant="secondary"
-              label={checkingIn ? '...' : 'เช็คอิน'}
-              disabled={checkingIn || !dmsConfigured}
-              onPress={handleCheckIn}
-              style={styles.checkinButton}
-            />
+            {justCheckedIn ? (
+              <View style={[styles.checkinButton, styles.checkinSuccess, { borderColor: accentColor }]}>
+                <CheckCircleIcon size={18} color={accentColor} />
+                <Text style={[styles.checkinSuccessText, { color: accentColor }]}>เช็คอินแล้ว</Text>
+              </View>
+            ) : (
+              <PrimaryButton
+                variant="secondary"
+                label={checkingIn ? '...' : 'เช็คอิน'}
+                disabled={checkingIn || !dmsConfigured}
+                onPress={handleCheckIn}
+                style={styles.checkinButton}
+              />
+            )}
           </View>
 
           <View style={styles.categoryList}>
@@ -246,7 +309,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                   style={styles.categoryRow}
                   accessibilityRole="button"
                   onPress={() =>
-                    Alert.alert(cat.nameTh, 'หน้ารายการไฟล์ในหมวดนี้ยังไม่ได้สร้าง (section 04 — placeholder)')
+                    appAlert(cat.nameTh, 'หน้ารายการไฟล์ในหมวดนี้ยังไม่ได้สร้าง (section 04 — placeholder)')
                   }
                 >
                   <IconBadge size={44} tint={themeColor}>
@@ -272,7 +335,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                   key={`custom-${safeNumber}`}
                   style={styles.categoryRow}
                   accessibilityRole="button"
-                  onPress={() => Alert.alert('ตั้งชื่อตู้เซฟของคุณ', 'การสร้างหมวดเองยังไม่ได้สร้าง (placeholder)')}
+                  onPress={() => appAlert('ตั้งชื่อตู้เซฟของคุณ', 'การสร้างหมวดเองยังไม่ได้สร้าง (placeholder)')}
                 >
                   <IconBadge size={44} tint={colors.textMuted}>
                     <PlusIcon size={20} color={colors.textMuted} />
@@ -318,7 +381,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   storageRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
-  storageText: { ...typography.body, fontSize: 13, color: colors.textSecondary },
+  storageText: { ...typography.body, fontSize: 15, color: colors.textSecondary },
   progressTrack: {
     height: 6,
     borderRadius: 3,
@@ -328,11 +391,21 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: colors.accentTeal, borderRadius: 3 },
   dmsCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dmsTextBlock: { flex: 1, marginRight: spacing.md },
-  dmsTitle: { ...typography.body, fontSize: 14, color: colors.textPrimary, marginBottom: 2 },
-  dmsExplainer: { ...typography.body, fontSize: 12, color: colors.textSecondary, marginBottom: 4, lineHeight: 17 },
-  dmsSubtitle: { ...typography.body, fontSize: 12, color: colors.textMuted },
-  dmsHint: { ...typography.body, fontSize: 11, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' },
+  dmsTitle: { ...typography.body, fontSize: 16, color: colors.textPrimary, marginBottom: 2 },
+  dmsExplainer: { ...typography.body, fontSize: 16, color: colors.textSecondary, marginBottom: 4, lineHeight: 17 },
+  dmsSubtitle: { ...typography.body, fontSize: 16, color: colors.textMuted },
+  dmsHint: { ...typography.body, fontSize: 16, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' },
+  checkinLogText: { ...typography.body, fontSize: 13, color: colors.textMuted, marginTop: 6 },
   checkinButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minWidth: 88 },
+  checkinSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    justifyContent: 'center',
+  },
+  checkinSuccessText: { ...typography.label, fontSize: 14 },
   categoryList: { marginTop: spacing.xs, marginBottom: spacing.lg },
   categoryRow: {
     flexDirection: 'row',
@@ -343,10 +416,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   categoryTextBlock: { flex: 1, marginRight: spacing.xs },
-  safeLabel: { ...typography.label, fontSize: 11, color: colors.accentTeal, marginBottom: 2 },
+  safeLabel: { ...typography.label, fontSize: 16, color: colors.accentTeal, marginBottom: 2 },
   categoryName: { ...typography.body, fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  categoryNameEn: { fontWeight: '400', color: colors.textMuted, fontSize: 13 },
-  categoryDescription: { ...typography.body, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  categoryCaption: { ...typography.body, fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  emptySlotText: { ...typography.body, fontSize: 13, color: colors.textMuted, fontStyle: 'italic' },
+  categoryNameEn: { fontWeight: '400', color: colors.textMuted, fontSize: 15 },
+  categoryDescription: { ...typography.body, fontSize: 16, color: colors.textSecondary, marginTop: 2 },
+  categoryCaption: { ...typography.body, fontSize: 16, color: colors.textMuted, marginTop: 2 },
+  emptySlotText: { ...typography.body, fontSize: 15, color: colors.textMuted, fontStyle: 'italic' },
 });
