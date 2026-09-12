@@ -131,13 +131,14 @@ export function DMSSetupScreen({ navigation, route }: Props) {
       <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <ScrollView>
-          <Text style={styles.title}>รหัสสำหรับผู้รับแต่ละคน</Text>
+          <Text style={styles.title}>รหัสกุญแจสำรองสำหรับแต่ละคน</Text>
           <Text style={styles.subtitle}>
             แสดงครั้งเดียวเท่านั้น — คัดลอกส่งให้แต่ละคนด้วยตัวเอง (นอกแอป) ระบบไม่เก็บรหัสนี้ซ้ำอีก
           </Text>
-          {revealed.map((g) => (
+          {revealed.map((g, i) => (
             <View key={g.nickname} style={styles.tokenCard}>
-              <Text style={styles.tokenNickname}>{g.nickname}</Text>
+              <Text style={styles.tokenNickname}>ผู้ถือกุญแจสำรอง: {g.nickname}</Text>
+              <Text style={styles.tokenLabel}>รหัสกุญแจสำรอง {i + 1}</Text>
               <Text style={styles.tokenValue} numberOfLines={2}>
                 {g.token}
               </Text>
@@ -157,10 +158,10 @@ export function DMSSetupScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safeArea}>
     <View style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>ตั้งค่า Dead Man's Switch (ไม่บังคับ)</Text>
+        <Text style={styles.title}>กุญแจไขความลับสำหรับทายาท (ไม่บังคับ)</Text>
         <Text style={styles.subtitle}>
-          ถ้าคุณไม่เช็คอินนานเกินกำหนด ระบบจะเริ่มปล่อยกุญแจให้ผู้รับที่ตั้งไว้ (ต้องมีอย่างน้อย 2 ใน{' '}
-          {guardianNames.length} คนร่วมกันถึงจะกู้คืนได้)
+          กุญแจนี้จะถูกส่งให้คนที่คุณระบุตัวตนไว้ (ทายาท/คนที่คุณไว้ใจ) ก็ต่อเมื่อห้องของคุณขาดการเช็คอินเกินเวลาที่คุณกำหนด
+          (ต้องมีอย่างน้อย 2 ใน {guardianNames.length} คนร่วมกันถึงจะกู้คืนได้)
         </Text>
 
         <View style={styles.toggleRow}>
@@ -188,13 +189,13 @@ export function DMSSetupScreen({ navigation, route }: Props) {
               })}
             </View>
 
-            <Text style={styles.fieldLabel}>ผู้รับ (อย่างน้อย {MIN_GUARDIANS} คน)</Text>
+            <Text style={styles.fieldLabel}>ผู้ถือกุญแจสำรอง (อย่างน้อย {MIN_GUARDIANS} คน)</Text>
             {guardianNames.map((name, i) => (
               <View key={i} style={styles.guardianRow}>
                 <TextInput
                   value={name}
                   onChangeText={(v) => updateGuardian(i, v)}
-                  placeholder={`ชื่อผู้รับคนที่ ${i + 1}`}
+                  placeholder={`ชื่อผู้ถือกุญแจสำรอง คนที่ ${i + 1}`}
                   placeholderTextColor={colors.textMuted}
                   style={styles.input}
                 />
@@ -207,14 +208,14 @@ export function DMSSetupScreen({ navigation, route }: Props) {
             ))}
             {guardianNames.length < MAX_GUARDIANS && (
               <Pressable onPress={addGuardian} accessibilityRole="button" style={styles.addLink}>
-                <Text style={styles.addLinkText}>+ เพิ่มผู้รับ</Text>
+                <Text style={styles.addLinkText}>+ เพิ่มผู้ถือกุญแจสำรอง</Text>
               </Pressable>
             )}
 
             <View style={styles.noteBox}>
               <Text style={styles.noteText}>
-                แอปนี้ไม่ส่ง SMS หรือ LINE แจ้งผู้รับให้อัตโนมัติ — คุณต้องคัดลอกรหัสที่จะแสดงในขั้นถัดไปแล้วส่งให้แต่ละคนด้วยตัวเอง
-                (นอกแอป) เอง
+                แอปนี้ไม่ส่ง SMS หรือ LINE แจ้งผู้ถือกุญแจสำรองให้อัตโนมัติ —
+                คุณต้องคัดลอกรหัสที่จะแสดงในขั้นถัดไปแล้วส่งให้แต่ละคนด้วยตัวเอง (นอกแอป) เอง
               </Text>
             </View>
           </>
@@ -289,5 +290,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   tokenNickname: { ...typography.body, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  tokenLabel: { ...typography.label, fontSize: 11, color: colors.textMuted, marginTop: -4 },
   tokenValue: { ...typography.mono, fontSize: 12, color: colors.textSecondary },
 });

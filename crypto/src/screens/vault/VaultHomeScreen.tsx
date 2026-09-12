@@ -104,7 +104,7 @@ function formatMB(bytes: number): string {
 
 function describeDms(status: AccountStatus): string {
   if (status.dmsThresholdHours == null || status.dmsHeartbeatAt == null) {
-    return 'ยังไม่ได้ตั้งค่า Dead Man’s Switch';
+    return 'ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท';
   }
   const eligibleAtMs = new Date(status.dmsHeartbeatAt).getTime() + status.dmsThresholdHours * 60 * 60 * 1000;
   const msRemaining = eligibleAtMs - Date.now();
@@ -155,7 +155,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
           prev ? { ...prev, dmsHeartbeatAt: result.dmsHeartbeatAt, dmsThresholdHours: result.dmsThresholdHours } : prev
         );
       } else {
-        Alert.alert('เช็คอิน', 'บัญชีนี้ยังไม่ได้ตั้งค่า Dead Man’s Switch');
+        Alert.alert('เช็คอิน', 'บัญชีนี้ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท');
       }
     } catch {
       Alert.alert('เช็คอิน', 'เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง');
@@ -219,12 +219,12 @@ export function VaultHomeScreen({ route, navigation }: Props) {
               <Text style={styles.dmsTitle}>เช็คอินความปลอดภัย</Text>
               <Text style={styles.dmsExplainer}>
                 กดปุ่มนี้เป็นระยะเพื่อบอกระบบว่า "ฉันยังอยู่" ถ้าคุณหายไปนานเกินกำหนด ระบบจะเริ่มส่งกุญแจของหมวด
-                พินัยกรรม/มรดกข้อมูล ให้ผู้รับที่คุณตั้งไว้
+                พินัยกรรม/มรดกข้อมูล ให้ผู้ถือกุญแจสำรองที่คุณตั้งไว้
               </Text>
               <Text style={styles.dmsSubtitle}>{status ? describeDms(status) : ''}</Text>
               {!dmsConfigured && (
                 <Text style={styles.dmsHint}>
-                  ปุ่มนี้จะกดได้เมื่อตั้งค่า Dead Man’s Switch แล้ว (หน้าตั้งค่ายังไม่ได้สร้าง)
+                  ปุ่มนี้จะกดได้เมื่อตั้งค่ากุญแจไขความลับสำหรับทายาทแล้ว (หน้าตั้งค่ายังไม่ได้สร้าง)
                 </Text>
               )}
             </View>

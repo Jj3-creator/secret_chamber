@@ -27,7 +27,7 @@ const TOTAL_STORAGE_BYTES = 104_857_600; // 100 MB, matches get-upload-url's cap
 const EVENT_LABELS: Record<ActivityLogEntry['eventType'], string> = {
   upload: 'อัปโหลดไฟล์',
   heartbeat: 'เช็คอินความปลอดภัย',
-  dms_setup: 'ตั้งค่า Dead Man’s Switch',
+  dms_setup: 'ตั้งค่ากุญแจไขความลับสำหรับทายาท',
 };
 
 function formatThaiDateTime(iso: string): string {
