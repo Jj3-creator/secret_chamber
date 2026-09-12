@@ -150,6 +150,16 @@ export function ChevronRightIcon(props: IconProps) {
   );
 }
 
+export function ChartIcon(props: IconProps) {
+  const { size, color, strokeWidth } = base(props);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 20V4M4 20h16" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M7.5 17v-5M12 17V9M16.5 17v-8" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function PlusIcon(props: IconProps) {
   const { size, color, strokeWidth } = base(props);
   return (

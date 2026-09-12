@@ -49,6 +49,9 @@ serve(async (req: Request) => {
     return json({ error: 'dms_not_configured' }, 400);
   }
 
+  const { error: logError } = await supabase.from('activity_log').insert({ account_id: accountId, event_type: 'heartbeat' });
+  if (logError) console.error('activity log insert failed', logError.message);
+
   return json({
     account_id: accountId,
     dms_heartbeat_at: data.dms_heartbeat_at,

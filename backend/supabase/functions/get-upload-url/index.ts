@@ -141,6 +141,13 @@ serve(async (req: Request) => {
     return json({ error: 'internal_error' }, 500);
   }
 
+  // Best-effort: powers the usage/activity dashboard. Never fail the
+  // actual upload flow over a logging hiccup.
+  const { error: logError } = await supabase
+    .from('activity_log')
+    .insert({ account_id, event_type: 'upload', detail: { blob_id: blobId, file_size_bytes } });
+  if (logError) console.error('activity log insert failed', logError.message);
+
   return json({
     blob_id: blobId,
     upload_url: uploadUrl,

@@ -46,6 +46,42 @@ serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
+  // IMPORTANT: Supabase's platform-level JWT verification (running because
+  // this function is deployed WITHOUT --no-verify-jwt) only checks that the
+  // bearer token is validly signed for this project — the anon key passes
+  // that check too, since it's also a legitimately-signed JWT, just with a
+  // different `role` claim. It does NOT by itself restrict this to
+  // service_role callers — verified the hard way: the anon key got a 200
+  // in testing before this check existed.
+  //
+  // Two valid shapes for the "real" credential, checked here explicitly:
+  //  1. It matches SUPABASE_SERVICE_ROLE_KEY exactly (works for whichever
+  //     key format — legacy JWT or the newer sb_secret_... — the platform
+  //     currently injects; confirmed by testing that this env var's format
+  //     can change without notice, so don't assume it's a JWT).
+  //  2. It's a JWT whose `role` claim is "service_role". Safe to trust
+  //     without re-verifying the signature ourselves: the platform's own
+  //     verify_jwt already confirmed this exact token is validly signed
+  //     for this project before our code ever runs — we're only reading
+  //     which role that already-authenticated token claims.
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const bearerToken = authHeader.replace(/^Bearer\s+/i, '');
+
+  function isServiceRoleJwt(token: string): boolean {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    try {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload?.role === 'service_role';
+    } catch {
+      return false;
+    }
+  }
+
+  if (bearerToken !== SUPABASE_SERVICE_ROLE_KEY && !isServiceRoleJwt(bearerToken)) {
+    return json({ error: 'forbidden' }, 403);
+  }
+
   let dryRun = false;
   try {
     const body = await req.json();

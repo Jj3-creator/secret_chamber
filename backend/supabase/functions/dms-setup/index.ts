@@ -141,6 +141,11 @@ serve(async (req: Request) => {
     return json({ error: 'internal_error' }, 500);
   }
 
+  const { error: logError } = await supabase
+    .from('activity_log')
+    .insert({ account_id: accountId, event_type: 'dms_setup', detail: { threshold_hours: thresholdHours, guardian_count: guardians.length } });
+  if (logError) console.error('activity log insert failed', logError.message);
+
   return json({
     account_id: accountId,
     threshold_hours: thresholdHours,

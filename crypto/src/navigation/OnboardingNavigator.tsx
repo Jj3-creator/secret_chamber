@@ -10,6 +10,7 @@ import { PersonalizeScreen } from '../screens/onboarding/PersonalizeScreen';
 import { DMSSetupScreen } from '../screens/onboarding/DMSSetupScreen';
 import { DoneScreen } from '../screens/onboarding/DoneScreen';
 import { VaultHomeScreen } from '../screens/vault/VaultHomeScreen';
+import { DashboardScreen } from '../screens/vault/DashboardScreen';
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
@@ -30,6 +31,8 @@ export type OnboardingStackParamList = {
   Done: { accountId: string; kdf: string };
   /** Screen 3.1 — Vault Dashboard home. See VaultHomeScreen.tsx for what's real vs. mock. */
   VaultHome: { accountId: string };
+  /** Usage summary + activity log — not part of the original design, added per feedback. */
+  Dashboard: { accountId: string };
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
@@ -46,6 +49,7 @@ export function OnboardingNavigator() {
         <Stack.Screen name="DMSSetup" component={DMSSetupScreen} />
         <Stack.Screen name="Done" component={DoneScreen} />
         <Stack.Screen name="VaultHome" component={VaultHomeScreen} />
+        <Stack.Screen name="Dashboard" component={DashboardScreen} />
       </Stack.Navigator>
     </OnboardingProvider>
   );

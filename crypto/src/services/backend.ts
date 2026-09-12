@@ -108,3 +108,30 @@ export async function setupDms(
     throw new Error(`setupDms: ${res.status} ${body?.error ?? ''}`);
   }
 }
+
+export type ActivityEventType = 'upload' | 'heartbeat' | 'dms_setup';
+
+export interface ActivityLogEntry {
+  eventType: ActivityEventType;
+  detail: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+/** Reads recent activity for the usage dashboard — same RLS pattern as getAccountStatus. */
+export async function getActivityLog(accountId: string, limit = 20): Promise<ActivityLogEntry[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/activity_log?account_id=eq.${accountId}&select=event_type,detail,created_at&order=created_at.desc&limit=${limit}`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'x-account-id': accountId,
+      },
+    }
+  );
+  if (!res.ok) throw new Error(`getActivityLog: unexpected ${res.status}`);
+
+  const rows: Array<{ event_type: ActivityEventType; detail: Record<string, unknown> | null; created_at: string }> =
+    await res.json();
+  return rows.map((r) => ({ eventType: r.event_type, detail: r.detail, createdAt: r.created_at }));
+}

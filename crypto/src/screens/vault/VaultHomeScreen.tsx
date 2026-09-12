@@ -21,6 +21,7 @@ import {
   FeatherIcon,
   LockIcon,
   GearIcon,
+  ChartIcon,
   ChevronRightIcon,
   PlusIcon,
 } from '../../components/icons';
@@ -111,7 +112,7 @@ function describeDms(status: AccountStatus): string {
   return `ครบกำหนดอีก ${daysRemaining} วัน`;
 }
 
-export function VaultHomeScreen({ route }: Props) {
+export function VaultHomeScreen({ route, navigation }: Props) {
   const { accountId } = route.params;
   const [status, setStatus] = useState<AccountStatus | null>(null);
   const [profile, setProfile] = useState<RoomProfile | null>(null);
@@ -174,14 +175,21 @@ export function VaultHomeScreen({ route }: Props) {
           </IconBadge>
           <Text style={styles.title}>{roomTitle}</Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => Alert.alert('ตั้งค่า', 'หน้าตั้งค่า (section 05) ยังไม่ได้สร้าง')}
-        >
-          <IconBadge size={40}>
-            <GearIcon size={20} color={colors.textPrimary} />
-          </IconBadge>
-        </Pressable>
+        <View style={styles.headerRight}>
+          <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Dashboard', { accountId })}>
+            <IconBadge size={40}>
+              <ChartIcon size={18} color={colors.textPrimary} />
+            </IconBadge>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => Alert.alert('ตั้งค่า', 'หน้าตั้งค่า (section 05) ยังไม่ได้สร้าง')}
+          >
+            <IconBadge size={40}>
+              <GearIcon size={20} color={colors.textPrimary} />
+            </IconBadge>
+          </Pressable>
+        </View>
       </View>
 
       {loading ? (
@@ -287,6 +295,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { ...typography.title, fontSize: 20, color: colors.textPrimary, flexShrink: 1 },
   loader: { marginTop: spacing.xxl },
   error: { color: colors.dangerText, marginBottom: spacing.md },
