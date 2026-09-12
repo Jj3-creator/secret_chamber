@@ -27,8 +27,11 @@ backend/
         ├── dms-heartbeat/
         │   ├── index.ts             # "I'm still here" check-in, pushes back the switch
         │   └── deno.json
-        └── dms-request-share/
-            ├── index.ts             # a guardian retrieves their wrapped share, once eligible
+        ├── dms-request-share/
+        │   ├── index.ts             # a guardian retrieves their wrapped share, once eligible
+        │   └── deno.json
+        └── cleanup-inactive-accounts/
+            ├── index.ts             # deletes accounts (+ R2 blobs) inactive > 1 year
             └── deno.json
 ```
 
@@ -85,6 +88,46 @@ shares and each has unwrapped theirs locally, nothing stops them combining
 right there on a guardian's device. The server never sees the plaintext
 shares or the reconstructed key at any point.
 
+## Auto-delete after 1 year of inactivity
+
+Feature request: "ถ้าไม่มี entry เกิน 1 ปี ห้องแห่งความลับนี้จะถูกลบทิ้ง
+ตลอดกาล ใครก็กู้ไม่ได้". [`cleanup-inactive-accounts`](supabase/functions/cleanup-inactive-accounts/index.ts)
+finds every `accounts` row with `last_active_at` older than 365 days,
+deletes that account's R2 objects first (`ListObjectsV2` + `DeleteObjects`
+under the `<account_id>/` prefix), then the DB row (cascades to `blobs` and
+`dms_guardians`) — in that order, so a failed R2 cleanup never leaves an
+orphaned, un-owned ciphertext blob with no row pointing at it.
+
+**This is the one genuinely irreversible operation in this backend** —
+call it with `{"dry_run": true}` first and read the `results` array before
+ever running it for real.
+
+Deploy it **without** `--no-verify-jwt` (unlike every other function
+here) — that makes Supabase reject any caller who isn't holding the
+`service_role` key, which is exactly who should be allowed to run a mass
+account-deletion sweep:
+
+```bash
+supabase functions deploy cleanup-inactive-accounts
+```
+
+Then schedule it from the Supabase Dashboard: **Database → Cron Jobs →
+New Cron Job**, type "Edge Function", target `cleanup-inactive-accounts`,
+schedule e.g. `0 3 * * *` (daily at 03:00 UTC). Doing it this way (rather
+than a SQL migration wiring up `pg_cron` + `pg_net` by hand) avoids ever
+needing to embed the service_role key in a version-controlled file — the
+Dashboard's Cron Jobs feature already knows how to invoke your project's
+own Edge Functions with the right credentials internally.
+
+Smoke test before scheduling anything:
+
+```bash
+curl -X POST "https://<project-ref>.supabase.co/functions/v1/cleanup-inactive-accounts" \
+  -H "Authorization: Bearer <service_role-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": true}'
+```
+
 ## Prerequisites
 
 ```bash
@@ -130,7 +173,12 @@ R2 → Manage API Tokens) with Object Read & Write permissions on that bucket.
    supabase functions deploy dms-setup --no-verify-jwt
    supabase functions deploy dms-heartbeat --no-verify-jwt
    supabase functions deploy dms-request-share --no-verify-jwt
+   supabase functions deploy cleanup-inactive-accounts
    ```
+
+   (Note: `cleanup-inactive-accounts` is deployed *without* `--no-verify-jwt`
+   — see "Auto-delete after 1 year of inactivity" below for why, and for
+   the one-time Dashboard step to actually schedule it.)
 
 5. **Smoke test:**
 
@@ -180,3 +228,10 @@ supabase functions serve dms-request-share --env-file .env --no-verify-jwt
   out-of-band by the owner. Notifying guardians that they're now eligible
   to request their share (rather than them polling `dms-request-share`)
   isn't built.
+- **PDPA consent / liability-waiver copy is NOT legal advice**: the
+  Warning screen's acknowledgment checkboxes (in `crypto/`) include draft
+  wording about the 1-year auto-delete and data-handling consent. That
+  text was written by an AI assistant, not reviewed by a lawyer — have
+  one review it (Thailand's PDPA specifically) before relying on it in
+  production. A checkbox cannot waive liability the law doesn't allow a
+  business to waive, regardless of what it says.
