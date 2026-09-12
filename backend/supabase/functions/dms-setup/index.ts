@@ -14,7 +14,12 @@ import { CORS_HEADERS, json, ACCOUNT_ID_RE, HEX64_RE } from '../_shared/http.ts'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const MIN_GUARDIANS = 2;
+// Client now allows 1-3 guardians (feedback: a forced minimum of 2 felt
+// arbitrary) — 1 guardian means a plain direct handoff with no Shamir
+// splitting (see DMSSetupScreen.tsx's thresholdFor()), which is still a
+// single guardian row here, so the server-side floor just needs to allow
+// that, not enforce any particular threshold scheme itself.
+const MIN_GUARDIANS = 1;
 const MAX_GUARDIANS = 255;
 const MIN_THRESHOLD_HOURS = 1;
 const MAX_THRESHOLD_HOURS = 24 * 365; // 1 year sanity cap

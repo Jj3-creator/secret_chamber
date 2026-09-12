@@ -42,8 +42,17 @@ const PERIOD_OPTIONS = [
   { label: '180 วัน', hours: 180 * 24 },
 ];
 
-const MIN_GUARDIANS = 2;
+// Feedback: forcing a minimum of 2 felt arbitrary — changed to "1 to 3,
+// your choice", with the trade-off spelled out in the UI instead of
+// hidden behind a hard rule. Threshold still requires 2-of-N whenever
+// there's more than 1 guardian (nobody can act alone), and drops to a
+// plain 1-of-1 handoff — no secret-splitting, no checks-and-balances —
+// only when the user deliberately picks a single guardian.
+const MIN_GUARDIANS = 1;
 const MAX_GUARDIANS = 3;
+function thresholdFor(guardianCount: number): number {
+  return guardianCount <= 1 ? 1 : 2;
+}
 
 interface RevealedGuardian {
   nickname: string;
@@ -57,6 +66,11 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
   const [enabled, setEnabled] = useState(false);
   const [periodHours, setPeriodHours] = useState(PERIOD_OPTIONS[1].hours); // 14 days default
+  // Preference only for now — there is no real SMS/LINE sending built (see
+  // the noteBox below), so this doesn't change what the app actually does
+  // yet. Kept as a separate, honestly-labeled toggle rather than silently
+  // ignored, so the choice is at least recorded for when that's built.
+  const [notifyEnabled, setNotifyEnabled] = useState(true);
   const [guardianNames, setGuardianNames] = useState<string[]>(['', '']);
   const [submitting, setSubmitting] = useState(false);
   const [revealed, setRevealed] = useState<RevealedGuardian[] | null>(null);
@@ -84,35 +98,47 @@ export function DMSSetupScreen({ navigation, route }: Props) {
     }
     const names = guardianNames.map((n) => n.trim());
     if (names.some((n) => !n) || names.length < MIN_GUARDIANS) {
-      Alert.alert('กรอกไม่ครบ', `ใส่ชื่อผู้รับอย่างน้อย ${MIN_GUARDIANS} คน`);
+      Alert.alert('กรอกไม่ครบ', `ใส่ชื่อผู้ถือกุญแจสำรองอย่างน้อย ${MIN_GUARDIANS} คน`);
       return;
     }
 
     setSubmitting(true);
     try {
       const tokens = await Promise.all(names.map(() => generateRandomToken()));
-      const { shares } = await createRecoveryShares(masterKeyHex, {
-        guardians: names.length,
-        threshold: MIN_GUARDIANS,
-      });
       const guardianKeys = await Promise.all(tokens.map((t) => deriveMasterKey(t)));
-      const wrapped = await Promise.all(
-        shares.map((s, i) => wrapVaultKey(s.valueHex, guardianKeys[i].masterKeyHex))
-      );
 
-      await setupDms(
-        accountId,
-        periodHours,
-        shares.map((s, i) => ({
-          shareIndex: s.index,
-          tokenHash: sha256Hex(tokens[i]),
-          wrapped: wrapped[i],
-        }))
-      );
+      // With exactly 1 guardian there's nothing to "split" — Shamir's
+      // library correctly refuses a threshold below 2 (a 1-of-1 share IS
+      // the secret, not a share of it). Wrap the real master key straight
+      // to that one person instead; anything >= 2 guardians goes through
+      // real 2-of-N secret splitting as before.
+      const rows =
+        names.length === 1
+          ? [{ shareIndex: 1, tokenHash: sha256Hex(tokens[0]), wrapped: await wrapVaultKey(masterKeyHex, guardianKeys[0].masterKeyHex) }]
+          : await (async () => {
+              const { shares } = await createRecoveryShares(masterKeyHex, {
+                guardians: names.length,
+                threshold: thresholdFor(names.length),
+              });
+              const wrapped = await Promise.all(
+                shares.map((s, i) => wrapVaultKey(s.valueHex, guardianKeys[i].masterKeyHex))
+              );
+              return shares.map((s, i) => ({
+                shareIndex: s.index,
+                tokenHash: sha256Hex(tokens[i]),
+                wrapped: wrapped[i],
+              }));
+            })();
+
+      await setupDms(accountId, periodHours, rows);
 
       setRevealed(names.map((nickname, i) => ({ nickname, token: tokens[i] })));
-    } catch {
-      Alert.alert('ตั้งค่าไม่สำเร็จ', 'ลองใหม่อีกครั้ง');
+    } catch (err) {
+      // Surface the real reason (e.g. the backend's own validation message)
+      // instead of a generic string — a silent "try again" here is exactly
+      // what made the 1-guardian backend-vs-client mismatch hard to see.
+      const reason = err instanceof Error ? err.message : String(err);
+      Alert.alert('ตั้งค่าไม่สำเร็จ', `ลองใหม่อีกครั้ง\n\n${reason}`);
     } finally {
       setSubmitting(false);
     }
@@ -161,7 +187,9 @@ export function DMSSetupScreen({ navigation, route }: Props) {
         <Text style={styles.title}>กุญแจไขความลับสำหรับทายาท (ไม่บังคับ)</Text>
         <Text style={styles.subtitle}>
           กุญแจนี้จะถูกส่งให้คนที่คุณระบุตัวตนไว้ (ทายาท/คนที่คุณไว้ใจ) ก็ต่อเมื่อห้องของคุณขาดการเช็คอินเกินเวลาที่คุณกำหนด
-          (ต้องมีอย่างน้อย 2 ใน {guardianNames.length} คนร่วมกันถึงจะกู้คืนได้)
+          {guardianNames.length <= 1
+            ? ' (มีผู้ถือกุญแจแค่คนเดียว คนนั้นจึงกู้คืนได้ทันทีด้วยรหัสของตัวเอง — ไม่มีใครช่วยตรวจสอบถ่วงดุล แนะนำให้เพิ่มเป็น 2-3 คนเพื่อความปลอดภัย)'
+            : ' (ต้องมีอย่างน้อย 2 คนยินยอมร่วมกันถึงจะกู้คืนได้ — กันไม่ให้คนใดคนหนึ่งแอบกู้คืนคนเดียว)'}
         </Text>
 
         <View style={styles.toggleRow}>
@@ -188,8 +216,27 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                 );
               })}
             </View>
+            <Text style={styles.periodExplainer}>
+              ความหมาย: ถ้าคุณไม่กดปุ่ม "เช็คอิน" ในห้องลับเลยเกิน{' '}
+              {PERIOD_OPTIONS.find((o) => o.hours === periodHours)?.label ?? ''} นับจากครั้งล่าสุด ระบบจะเริ่มให้ผู้ถือกุญแจสำรองกู้คืนกุญแจได้
+            </Text>
 
-            <Text style={styles.fieldLabel}>ผู้ถือกุญแจสำรอง (อย่างน้อย {MIN_GUARDIANS} คน)</Text>
+            <View style={[styles.toggleRow, { marginBottom: spacing.xs }]}>
+              <Text style={styles.toggleLabel}>แจ้งเตือนทายาทเมื่อครบกำหนด</Text>
+              <Switch value={notifyEnabled} onValueChange={setNotifyEnabled} />
+            </View>
+            <Text style={styles.notifyCaveat}>
+              (ตอนนี้แอปยังส่งแจ้งเตือนอัตโนมัติไม่ได้จริง — ค่านี้แค่บันทึกความต้องการของคุณไว้ก่อน จนกว่าจะเชื่อมระบบส่ง SMS/LINE จริง)
+            </Text>
+
+            <View style={styles.warnBox}>
+              <Text style={styles.warnText}>
+                ปุ่ม "เช็คอิน" เดียวกันนี้ใช้นับเวลาสำหรับการลบห้องอัตโนมัติด้วย — ถ้าคุณไม่เช็คอินเลยเกิน 1 ปี ห้องนี้และไฟล์ทั้งหมดจะถูกลบถาวรโดยอัตโนมัติ
+                กู้คืนไม่ได้ ไม่ว่าจะตั้งค่าผู้ถือกุญแจสำรองไว้หรือไม่ก็ตาม
+              </Text>
+            </View>
+
+            <Text style={styles.fieldLabel}>ผู้ถือกุญแจสำรอง ({MIN_GUARDIANS}-{MAX_GUARDIANS} คน)</Text>
             {guardianNames.map((name, i) => (
               <View key={i} style={styles.guardianRow}>
                 <TextInput
@@ -255,7 +302,18 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xl },
   toggleLabel: { ...typography.body, fontSize: 15, color: colors.textPrimary },
   fieldLabel: { ...typography.label, fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm },
-  periodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xl },
+  periodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
+  periodExplainer: { ...typography.body, fontSize: 12, color: colors.textMuted, lineHeight: 17, marginBottom: spacing.lg },
+  notifyCaveat: { ...typography.body, fontSize: 11, color: colors.textMuted, fontStyle: 'italic', lineHeight: 16, marginBottom: spacing.lg },
+  warnBox: {
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    backgroundColor: colors.danger,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  warnText: { ...typography.body, fontSize: 12, color: colors.dangerText, lineHeight: 18 },
   periodChip: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   periodChipActive: { borderColor: colors.accentTeal, backgroundColor: 'rgba(127,166,177,0.12)' },
   periodChipText: { ...typography.body, fontSize: 13, color: colors.textSecondary },
