@@ -24,7 +24,6 @@ import {
   LockIcon,
   GearIcon,
   ChartIcon,
-  ChevronRightIcon,
   PlusIcon,
   CheckCircleIcon,
   LockClosedIcon,
@@ -300,30 +299,29 @@ export function VaultHomeScreen({ route, navigation }: Props) {
             )}
           </View>
 
-          <View style={styles.categoryList}>
+          {/* Feedback: laid out as a 3x4 grid of "safe" tiles — empty
+              slots read as visibly empty at a glance (dashed border,
+              muted "+"), and unnamed custom slots show a big standalone
+              number rather than a full text row, per the exact request. */}
+          <View style={styles.grid}>
             {CATEGORIES.map((cat, i) => {
               const Icon = cat.icon;
               return (
                 <Pressable
                   key={cat.nameEn}
-                  style={styles.categoryRow}
+                  style={styles.tile}
                   accessibilityRole="button"
                   onPress={() =>
                     appAlert(cat.nameTh, 'หน้ารายการไฟล์ในหมวดนี้ยังไม่ได้สร้าง (section 04 — placeholder)')
                   }
                 >
-                  <IconBadge size={44} tint={themeColor}>
-                    <Icon size={22} color={colors.textPrimary} />
+                  <Text style={[styles.tileNumber, { color: themeColor }]}>{i + 1}</Text>
+                  <IconBadge size={40} tint={themeColor} style={styles.tileIcon}>
+                    <Icon size={20} color={colors.textPrimary} />
                   </IconBadge>
-                  <View style={styles.categoryTextBlock}>
-                    <Text style={[styles.safeLabel, { color: themeColor }]}>ตู้เซฟใบที่ {i + 1}</Text>
-                    <Text style={styles.categoryName}>
-                      {cat.nameTh} <Text style={styles.categoryNameEn}>({cat.nameEn})</Text>
-                    </Text>
-                    <Text style={styles.categoryDescription}>{cat.description}</Text>
-                    <Text style={styles.categoryCaption}>{cat.caption}</Text>
-                  </View>
-                  <ChevronRightIcon size={18} color={colors.textMuted} />
+                  <Text style={styles.tileName} numberOfLines={2}>
+                    {cat.nameTh}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -333,17 +331,13 @@ export function VaultHomeScreen({ route, navigation }: Props) {
               return (
                 <Pressable
                   key={`custom-${safeNumber}`}
-                  style={styles.categoryRow}
+                  style={[styles.tile, styles.tileEmpty]}
                   accessibilityRole="button"
                   onPress={() => appAlert('ตั้งชื่อตู้เซฟของคุณ', 'การสร้างหมวดเองยังไม่ได้สร้าง (placeholder)')}
                 >
-                  <IconBadge size={44} tint={colors.textMuted}>
-                    <PlusIcon size={20} color={colors.textMuted} />
-                  </IconBadge>
-                  <View style={styles.categoryTextBlock}>
-                    <Text style={styles.safeLabel}>ตู้เซฟใบที่ {safeNumber}</Text>
-                    <Text style={styles.emptySlotText}>แตะเพื่อตั้งชื่อหมวดของคุณเอง</Text>
-                  </View>
+                  <Text style={styles.tileEmptyNumber}>{safeNumber}</Text>
+                  <PlusIcon size={16} color={colors.textMuted} />
+                  <Text style={styles.tileEmptyLabel}>ว่าง — แตะเพื่อตั้งชื่อ</Text>
                 </Pressable>
               );
             })}
@@ -406,20 +400,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkinSuccessText: { ...typography.label, fontSize: 14 },
-  categoryList: { marginTop: spacing.xs, marginBottom: spacing.lg },
-  categoryRow: {
+  // 3-column grid of "safe" tiles (feedback: rows of text felt like a
+  // file list, not a room of safes — this reads more like a wall of
+  // safes at a glance, with empty ones visibly empty).
+  grid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: spacing.md,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
   },
-  categoryTextBlock: { flex: 1, marginRight: spacing.xs },
-  safeLabel: { ...typography.label, fontSize: 16, color: colors.accentTeal, marginBottom: 2 },
-  categoryName: { ...typography.body, fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  categoryNameEn: { fontWeight: '400', color: colors.textMuted, fontSize: 15 },
-  categoryDescription: { ...typography.body, fontSize: 16, color: colors.textSecondary, marginTop: 2 },
-  categoryCaption: { ...typography.body, fontSize: 16, color: colors.textMuted, marginTop: 2 },
-  emptySlotText: { ...typography.body, fontSize: 15, color: colors.textMuted, fontStyle: 'italic' },
+  tile: {
+    width: '31%',
+    aspectRatio: 0.92,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  tileNumber: { ...typography.label, fontSize: 13, position: 'absolute', top: 8, left: 10 },
+  tileIcon: { marginBottom: spacing.xs },
+  tileName: { ...typography.body, fontSize: 13, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  // Unnamed custom slots — a big standalone number instead of a text
+  // row, so it's obviously a placeholder waiting to be named, not a
+  // real safe with content.
+  tileEmpty: { borderStyle: 'dashed', backgroundColor: 'transparent' },
+  tileEmptyNumber: { ...typography.title, fontSize: 30, color: colors.textMuted, marginBottom: 2 },
+  tileEmptyLabel: { ...typography.body, fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 4 },
 });
