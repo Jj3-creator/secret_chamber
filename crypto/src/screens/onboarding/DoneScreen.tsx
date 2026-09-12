@@ -1,7 +1,5 @@
-// Landing screen right after onboarding completes. The design's section 1
-// actually continues to 1.5 (set Real + Decoy PIN) before reaching the
-// dashboard — not built yet — so this offers a direct shortcut into
-// VaultHome, clearly marked as a temporary bridge rather than the real flow.
+// Landing screen right after onboarding completes — reached after the
+// optional SetPin and DMSSetup steps.
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -44,20 +42,13 @@ export function DoneScreen({ route, navigation }: Props) {
         </Pressable>
         {showTechDetails && (
           <View style={styles.techBox}>
-            <Text style={styles.techLabel}>account_id (คำนวณจาก 12 คำ — ไม่ต้องจดแยก):</Text>
+            <Text style={styles.techLabel}>รหัสห้อง (คำนวณจาก 12 คำ — ไม่ต้องจดแยก):</Text>
             <Text style={styles.techValue} numberOfLines={2}>
               {accountId}
             </Text>
-            <Text style={styles.techLabel}>key derivation: {kdf}</Text>
+            <Text style={styles.techLabel}>วิธีเข้ารหัส: {kdf}</Text>
           </View>
         )}
-
-        <View style={styles.placeholderBox}>
-          <Text style={styles.placeholderText}>
-            (ยังไม่ได้สร้างหน้า 1.5 ตั้ง Real/Decoy PIN และหน้า Login/Unlock — ปุ่มด้านล่างข้ามไปที่ห้องลับตรงๆ
-            ชั่วคราว)
-          </Text>
-        </View>
       </View>
       <PrimaryButton
         label="เข้าห้องลับของฉัน (My Secret Chamber)"
@@ -92,11 +83,4 @@ const styles = StyleSheet.create({
   },
   techLabel: { ...typography.body, fontSize: 16, color: colors.textMuted, marginBottom: 4 },
   techValue: { ...typography.mono, fontSize: 15, color: colors.textPrimary, marginBottom: spacing.sm },
-  placeholderBox: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: spacing.md,
-  },
-  placeholderText: { ...typography.body, fontSize: 16, color: colors.textMuted, fontStyle: 'italic' },
 });

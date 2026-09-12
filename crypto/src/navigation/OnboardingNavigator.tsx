@@ -13,6 +13,7 @@ import { DMSSetupScreen } from '../screens/onboarding/DMSSetupScreen';
 import { DoneScreen } from '../screens/onboarding/DoneScreen';
 import { VaultHomeScreen } from '../screens/vault/VaultHomeScreen';
 import { DashboardScreen } from '../screens/vault/DashboardScreen';
+import { CategoryDetailScreen } from '../screens/vault/CategoryDetailScreen';
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
@@ -35,18 +36,14 @@ export type OnboardingStackParamList = {
   Personalize: { accountId: string; kdf: string };
   /** Optional — check-in period + guardians, real crypto + real backend calls. See DMSSetupScreen.tsx. */
   DMSSetup: { accountId: string; kdf: string };
-  /**
-   * Placeholder landing screen right after DMS Setup. The design's
-   * section "1. Onboarding / Register" actually continues to 1.5 (set
-   * Real + Decoy PIN) before reaching the dashboard — not built yet, so
-   * Done offers a direct shortcut into VaultHome instead, clearly labeled
-   * as a temporary bridge rather than the real flow.
-   */
+  /** Landing screen right after onboarding completes (after the optional SetPin + DMSSetup steps). */
   Done: { accountId: string; kdf: string };
   /** Screen 3.1 — Vault Dashboard home. See VaultHomeScreen.tsx for what's real vs. mock. */
   VaultHome: { accountId: string };
   /** Usage summary + activity log — not part of the original design, added per feedback. */
   Dashboard: { accountId: string };
+  /** One safe's own page — name/description, and which guardians can access it. See CategoryDetailScreen.tsx. */
+  CategoryDetail: { accountId: string; categoryId: string };
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
@@ -74,6 +71,7 @@ export function OnboardingNavigator({ initialRouteName }: Props) {
         <Stack.Screen name="Done" component={DoneScreen} />
         <Stack.Screen name="VaultHome" component={VaultHomeScreen} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
+        <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
       </Stack.Navigator>
     </OnboardingProvider>
   );

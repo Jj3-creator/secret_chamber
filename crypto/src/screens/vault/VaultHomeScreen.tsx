@@ -7,7 +7,7 @@
 // categories), so their file counts/sizes below just mirror the design's
 // example numbers. Tapping one shows a placeholder alert rather than a
 // real file list (section 04, "Upload / View item", isn't built yet).
-import React, { useCallback, useEffect, useState, type ComponentType } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
@@ -15,19 +15,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
 import { ThemedBackground } from '../../components/ThemedBackground';
 import { appAlert, appConfirm } from '../../components/AppAlert';
-import {
-  type IconProps,
-  ImageStackIcon,
-  DocumentIcon,
-  HeartPulseIcon,
-  FeatherIcon,
-  LockIcon,
-  GearIcon,
-  ChartIcon,
-  PlusIcon,
-  CheckCircleIcon,
-  LockClosedIcon,
-} from '../../components/icons';
+import { GearIcon, ChartIcon, PlusIcon, CheckCircleIcon, LockClosedIcon } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, sendHeartbeat, type AccountStatus } from '../../services/backend';
 import { loadRoomProfile, type RoomProfile } from '../../services/localProfile';
@@ -35,72 +23,15 @@ import { recordCheckin, loadCheckinLog, type CheckinLog } from '../../services/c
 import { loadDeviceLock } from '../../services/deviceLock';
 import { getAvatarComponent } from '../../components/avatars';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
+import { CATEGORIES } from '../../data/categories';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'VaultHome'>;
 
 const TOTAL_STORAGE_BYTES = 104_857_600; // 100 MB, matches the backend's get-upload-url cap
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-// 5 real categories (Decoy Chamber deliberately excluded — see comment
-// below) + 7 blank custom slots = 12 total ("ครบโหล" per feedback).
+// 5 real categories (Decoy Chamber deliberately excluded — see categories.ts)
+// + 7 blank custom slots = 12 total ("ครบโหล" per feedback).
 const CUSTOM_SLOT_COUNT = 7;
-
-interface CategoryRow {
-  /** Thai name — primary label per feedback (Thai first, English keyword secondary). */
-  nameTh: string;
-  nameEn: string;
-  /** What this safe is meant to hold — shown as a third line under the name. */
-  description: string;
-  caption: string;
-  icon: ComponentType<IconProps>;
-}
-
-// Mock — see file header. Content matches the design's example data;
-// Thai-primary naming + descriptions added per user feedback.
-const CATEGORIES: CategoryRow[] = [
-  {
-    nameTh: 'ความทรงจำส่วนตัว',
-    nameEn: 'Personal Memory Vault',
-    description: 'รูปภาพ วิดีโอ ไดอารี่ หรือความทรงจำที่มีความหมายกับคุณ',
-    caption: '18 ไฟล์ · 14.8 MB',
-    icon: ImageStackIcon,
-  },
-  {
-    nameTh: 'เอกสารสำคัญ',
-    nameEn: 'Critical Documents',
-    description: 'พาสปอร์ต สัญญา โฉนดที่ดิน เอกสารราชการ',
-    caption: '9 ไฟล์ · 11.2 MB',
-    icon: DocumentIcon,
-  },
-  {
-    nameTh: 'สุขภาพและเรื่องอ่อนไหว',
-    nameEn: 'Health & Sensitive Personal',
-    description: 'ผลตรวจสุขภาพ ประวัติการรักษา ข้อมูลส่วนตัวที่ละเอียดอ่อน',
-    caption: '6 ไฟล์ · 4.1 MB',
-    icon: HeartPulseIcon,
-  },
-  {
-    nameTh: 'พินัยกรรม/มรดกข้อมูล',
-    nameEn: 'Ethical Will / Legacy',
-    description: 'สิ่งที่อยากส่งต่อให้คนที่รัก หลังจากคุณจากไป',
-    caption: '3 ไฟล์ · 1.9 MB · ผูกกับ DMS',
-    icon: FeatherIcon,
-  },
-  {
-    nameTh: 'เนื้อหาความอ่อนไหวสูง',
-    nameEn: 'High-Sensitivity Content',
-    description: 'ต้องใส่ PIN ซ้ำอีกชั้นก่อนเข้าดู',
-    caption: 'ล็อกซ้อน · ต้องใส่ PIN อีกครั้ง',
-    icon: LockIcon,
-  },
-  // NO "Decoy Chamber" entry here — on purpose. This screen is what the
-  // REAL PIN unlocks. If the decoy vault showed up as just another row in
-  // this list, anyone who coerces the owner into unlocking the real vault
-  // would immediately see "there's a decoy" and know to demand the other
-  // PIN too — defeating the entire point of having one. Per the design
-  // (screen 2.3, "ผลลัพธ์: DECOY CHAMBER"), the decoy vault is its own
-  // completely separate screen, reachable ONLY by entering the Decoy PIN
-  // at unlock (section 02, not built yet) — never listed inside this one.
-];
 
 function formatMB(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1);
@@ -234,7 +165,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            onPress={() => appAlert('ตั้งค่า', 'หน้าตั้งค่า (section 05) ยังไม่ได้สร้าง')}
+            onPress={() => appAlert('ตั้งค่า', 'หน้าตั้งค่าจะพร้อมใช้งานเร็วๆ นี้')}
           >
             <IconBadge size={40}>
               <GearIcon size={20} color={colors.textPrimary} />
@@ -278,9 +209,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                 </Text>
               )}
               {!dmsConfigured && (
-                <Text style={styles.dmsHint}>
-                  ปุ่มนี้จะกดได้เมื่อตั้งค่ากุญแจไขความลับสำหรับทายาทแล้ว (หน้าตั้งค่ายังไม่ได้สร้าง)
-                </Text>
+                <Text style={styles.dmsHint}>ปุ่มนี้จะกดได้เมื่อตั้งค่ากุญแจไขความลับสำหรับทายาทแล้ว</Text>
               )}
             </View>
             {justCheckedIn ? (
@@ -308,13 +237,14 @@ export function VaultHomeScreen({ route, navigation }: Props) {
               const Icon = cat.icon;
               return (
                 <Pressable
-                  key={cat.nameEn}
-                  style={styles.tile}
+                  key={cat.id}
+                  style={[styles.tile, { borderColor: `${themeColor}55` }]}
                   accessibilityRole="button"
-                  onPress={() =>
-                    appAlert(cat.nameTh, 'หน้ารายการไฟล์ในหมวดนี้ยังไม่ได้สร้าง (section 04 — placeholder)')
-                  }
+                  onPress={() => navigation.navigate('CategoryDetail', { accountId, categoryId: cat.id })}
                 >
+                  {/* A small ring behind the icon — reads as a safe/vault
+                      dial rather than a plain app icon badge. */}
+                  <View style={[styles.tileDialOuter, { borderColor: `${themeColor}40` }]} />
                   <Text style={[styles.tileNumber, { color: themeColor }]}>{i + 1}</Text>
                   <IconBadge size={40} tint={themeColor} style={styles.tileIcon}>
                     <Icon size={20} color={colors.textPrimary} />
@@ -333,7 +263,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                   key={`custom-${safeNumber}`}
                   style={[styles.tile, styles.tileEmpty]}
                   accessibilityRole="button"
-                  onPress={() => appAlert('ตั้งชื่อตู้เซฟของคุณ', 'การสร้างหมวดเองยังไม่ได้สร้าง (placeholder)')}
+                  onPress={() => appAlert('ตั้งชื่อตู้เซฟของคุณ', 'ฟีเจอร์สร้างหมวดของคุณเองจะพร้อมใช้งานเร็วๆ นี้')}
                 >
                   <Text style={styles.tileEmptyNumber}>{safeNumber}</Text>
                   <PlusIcon size={16} color={colors.textMuted} />
@@ -366,13 +296,21 @@ const styles = StyleSheet.create({
   title: { ...typography.title, fontSize: 20, color: colors.textPrimary, flexShrink: 1 },
   loader: { marginTop: spacing.xxl },
   error: { color: colors.dangerText, marginBottom: spacing.md },
+  // Feedback: "app ยังดูไม่น่าใช้" — flat bordered boxes read as plain
+  // wireframes. A soft shadow gives cards actual depth against the
+  // background instead of just a thin outline.
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: spacing.md,
     marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 3,
   },
   storageRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   storageText: { ...typography.body, fontSize: 15, color: colors.textSecondary },
@@ -413,14 +351,30 @@ const styles = StyleSheet.create({
   tile: {
     width: '31%',
     aspectRatio: 0.92,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xs,
     marginBottom: spacing.sm,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  // A faint ring behind the icon — a stand-in "combination dial", so the
+  // tile reads as a little safe door rather than a plain settings-style
+  // icon card (feedback: "ทำช่องให้เป็นรูปตู้เซฟ").
+  tileDialOuter: {
+    position: 'absolute',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    borderWidth: 2,
   },
   tileNumber: { ...typography.label, fontSize: 13, position: 'absolute', top: 8, left: 10 },
   tileIcon: { marginBottom: spacing.xs },

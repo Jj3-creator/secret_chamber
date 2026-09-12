@@ -113,10 +113,7 @@ export function DashboardScreen({ navigation, route }: Props) {
             <IconBadge size={32} tint={colors.textMuted}>
               <ImageStackIcon size={16} color={colors.textMuted} />
             </IconBadge>
-            <Text style={styles.noteText}>
-              ยังไม่มีข้อมูลแยกพื้นที่ใช้งานตามหมวด — ไฟล์ที่อัปโหลดยังไม่ได้ผูกกับหมวดเก็บของ (หน้าอัปโหลด/section 04
-              ยังไม่ได้สร้าง)
-            </Text>
+            <Text style={styles.noteText}>ข้อมูลพื้นที่ใช้งานแยกตามหมวดจะพร้อมใช้งานเร็วๆ นี้</Text>
           </View>
 
           <Text style={styles.sectionLabel}>กิจกรรมล่าสุด</Text>

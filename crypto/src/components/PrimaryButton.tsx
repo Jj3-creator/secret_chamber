@@ -39,7 +39,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primary: { backgroundColor: colors.accent },
+  // Feedback: the app "ยังดูไม่น่าใช้" — a flat-filled button on a flat
+  // background reads as unfinished. A soft shadow gives the primary CTA
+  // some lift; secondary buttons stay flat (their border already does
+  // the job, and not every button needs to compete for attention).
+  primary: {
+    backgroundColor: colors.accent,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
   secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
   disabled: { opacity: 0.4 },
   pressed: { opacity: 0.85 },

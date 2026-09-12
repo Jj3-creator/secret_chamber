@@ -62,7 +62,7 @@ export function WelcomeScreen({ navigation }: Props) {
         <Pressable
           style={styles.recoverLink}
           accessibilityRole="button"
-          onPress={() => appAlert('กู้คืนด้วย 12 คำ', 'หน้ากู้คืน (section 02) ยังไม่ได้สร้าง')}
+          onPress={() => appAlert('กู้คืนด้วย 12 คำ', 'ฟีเจอร์นี้จะพร้อมใช้งานเร็วๆ นี้')}
         >
           <Text style={styles.recoverLinkText}>กู้คืนด้วย 12 คำ</Text>
         </Pressable>
