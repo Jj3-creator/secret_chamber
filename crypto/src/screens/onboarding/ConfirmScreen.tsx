@@ -17,7 +17,7 @@ const MAX_SUGGESTIONS = 3;
 const THAI_ORDINALS = ['หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า', 'สิบ', 'สิบเอ็ด', 'สิบสอง'];
 
 export function ConfirmScreen({ navigation }: Props) {
-  const { passphrase, confirmPositions, passphraseLanguage, clear } = useOnboarding();
+  const { passphrase, confirmPositions, passphraseLanguage, setMasterKeyHex, clearPassphrase } = useOnboarding();
   const targetWords = useMemo(() => passphrase?.split(' ') ?? [], [passphrase]);
   const wordlist = passphraseLanguage === 'th' ? THAI_WORDLIST : wordlists.english;
 
@@ -50,7 +50,8 @@ export function ConfirmScreen({ navigation }: Props) {
     try {
       const { masterKeyHex, kdf } = await deriveMasterKey(passphrase);
       const accountId = deriveAccountId(masterKeyHex);
-      clear(); // done with the passphrase — drop it from memory now
+      setMasterKeyHex(masterKeyHex); // DMS Setup may still need it — cleared there (or in Personalize if skipped)
+      clearPassphrase(); // done with the passphrase itself either way
       navigation.navigate('Personalize', { accountId, kdf });
     } finally {
       setBusy(false);

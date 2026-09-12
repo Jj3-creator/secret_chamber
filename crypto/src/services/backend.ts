@@ -77,3 +77,34 @@ export async function sendHeartbeat(accountId: string): Promise<HeartbeatResult 
   const body = await res.json();
   return { dmsHeartbeatAt: body.dms_heartbeat_at, dmsThresholdHours: body.dms_threshold_hours };
 }
+
+export interface DmsGuardianInput {
+  shareIndex: number;
+  tokenHash: string;
+  wrapped: { cipherText: string; iv: string };
+}
+
+/** Registers (or replaces) an account's Dead Man's Switch guardians + threshold. See dms-setup/index.ts. */
+export async function setupDms(
+  accountId: string,
+  thresholdHours: number,
+  guardians: DmsGuardianInput[]
+): Promise<void> {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/dms-setup`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      account_id: accountId,
+      threshold_hours: thresholdHours,
+      guardians: guardians.map((g) => ({
+        share_index: g.shareIndex,
+        token_hash: g.tokenHash,
+        wrapped: g.wrapped,
+      })),
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(`setupDms: ${res.status} ${body?.error ?? ''}`);
+  }
+}

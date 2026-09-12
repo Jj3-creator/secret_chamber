@@ -29,7 +29,7 @@ export function PersonalizeScreen({ navigation, route }: Props) {
     setSaving(true);
     try {
       await saveRoomProfile(accountId, { nickname: nickname.trim(), avatarId, themeId });
-      navigation.navigate('Done', { accountId, kdf });
+      navigation.navigate('DMSSetup', { accountId, kdf });
     } finally {
       setSaving(false);
     }

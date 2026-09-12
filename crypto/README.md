@@ -102,6 +102,37 @@ The in-progress passphrase lives only in [`OnboardingContext`](src/screens/onboa
 
 Running the actual app surfaced something `npm test` couldn't: `bip39` uses Node's **global** `Buffer` internally, which neither a browser nor React Native provides by default. `generatePassphrase()` threw `ReferenceError: Buffer is not defined` the first time it ran for real — the Jest suite never caught this because Node (Jest's test environment) already has a real global `Buffer`, masking the gap. Fixed by [`src/polyfills.ts`](src/polyfills.ts), imported first in `App.tsx`. If you ever restructure the entry point, keep that import first.
 
+## DMS Setup (feature B — real crypto + real backend, no real SMS/LINE)
+
+Feature request: notify a phone/LINE contact after too much inactivity.
+[`DMSSetupScreen.tsx`](src/screens/onboarding/DMSSetupScreen.tsx) is an
+optional step (Personalize → DMS Setup → Done) covering the check-in
+period + 2-3 guardians from design screens 1.5/5.1/5.2, combined into one
+screen since those aren't separately built.
+
+**Real**: `vault.ts`'s `createRecoveryShares` splits the master key,
+`wrapVaultKey` wraps each share, `backend.ts`'s `setupDms` calls the
+actual deployed `dms-setup` function — the same one tested in Part 2.
+Guardian key design: rather than requiring each guardian to have their
+own pre-existing app account/PIN, a random recovery token generated here
+**is** the guardian's credential — it both authenticates their
+`dms-request-share` call and (via `deriveMasterKey`) derives the key that
+unwraps their share. The owner hands this token over out-of-band (print
+it, say it) — the token is shown once, on a reveal screen styled like the
+passphrase reveal, with the same "own risk if you screenshot/copy it"
+framing.
+
+**Not real**: actually sending that token by SMS or LINE. That needs a
+third-party provider (Twilio, LINE Messaging API) and API keys this
+session doesn't have — the screen says so explicitly rather than
+pretending to send anything.
+
+Verified live against the real backend: submitted 2 guardians + a 30-day
+period, got back two distinct 64-hex-char tokens, confirmed VaultHome
+then showed "ครบกำหนดอีก 30 วัน" and an enabled check-in button (both were
+showing the "not configured" state before this ran) — then deleted the
+test account.
+
 ## The full design (all 16 screens)
 
 The Claude Design canvas ("Secret Chamber Flow") turned out to have a

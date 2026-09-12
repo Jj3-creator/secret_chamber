@@ -7,6 +7,7 @@ import { WarningScreen } from '../screens/onboarding/WarningScreen';
 import { PassphraseScreen } from '../screens/onboarding/PassphraseScreen';
 import { ConfirmScreen } from '../screens/onboarding/ConfirmScreen';
 import { PersonalizeScreen } from '../screens/onboarding/PersonalizeScreen';
+import { DMSSetupScreen } from '../screens/onboarding/DMSSetupScreen';
 import { DoneScreen } from '../screens/onboarding/DoneScreen';
 import { VaultHomeScreen } from '../screens/vault/VaultHomeScreen';
 
@@ -17,8 +18,10 @@ export type OnboardingStackParamList = {
   Confirm: undefined;
   /** Nickname/avatar/theme, stored locally only — not part of the original design, added per feedback. */
   Personalize: { accountId: string; kdf: string };
+  /** Optional — check-in period + guardians, real crypto + real backend calls. See DMSSetupScreen.tsx. */
+  DMSSetup: { accountId: string; kdf: string };
   /**
-   * Placeholder landing screen right after Personalize. The design's
+   * Placeholder landing screen right after DMS Setup. The design's
    * section "1. Onboarding / Register" actually continues to 1.5 (set
    * Real + Decoy PIN) before reaching the dashboard — not built yet, so
    * Done offers a direct shortcut into VaultHome instead, clearly labeled
@@ -40,6 +43,7 @@ export function OnboardingNavigator() {
         <Stack.Screen name="Passphrase" component={PassphraseScreen} />
         <Stack.Screen name="Confirm" component={ConfirmScreen} />
         <Stack.Screen name="Personalize" component={PersonalizeScreen} />
+        <Stack.Screen name="DMSSetup" component={DMSSetupScreen} />
         <Stack.Screen name="Done" component={DoneScreen} />
         <Stack.Screen name="VaultHome" component={VaultHomeScreen} />
       </Stack.Navigator>

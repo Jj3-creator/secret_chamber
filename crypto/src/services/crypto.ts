@@ -105,6 +105,22 @@ function base64ToBytes(b64: string): Uint8Array {
 export type PassphraseLanguage = 'en' | 'th';
 
 /**
+ * A random hex token — used e.g. as a DMS guardian's recovery credential
+ * (see vault.ts / dms-setup): both what authenticates their
+ * dms-request-share call (server stores only its SHA-256) and, derived
+ * through deriveMasterKey, the key that unwraps their Shamir share.
+ * Default 32 bytes (256 bits) — far more entropy than needed, cheap to afford.
+ */
+export async function generateRandomToken(byteLength = 32): Promise<string> {
+  const bytes = await ExpoCrypto.getRandomBytesAsync(byteLength);
+  try {
+    return bytesToHex(bytes);
+  } finally {
+    wipe(bytes);
+  }
+}
+
+/**
  * Generates a random 12-word BIP-39-style mnemonic passphrase (128 bits of
  * entropy). Entropy is sourced from expo-crypto's CSPRNG, not from bip39's
  * own RNG, so no `react-native-get-random-values` polyfill is required.
@@ -213,6 +229,11 @@ export async function deriveMasterKey(
  * hex-encoded. This is the ONLY identifier that may ever leave the device —
  * never send masterKeyHex or the passphrase to the server.
  */
+/** hex(SHA-256(utf8(input))) — used for e.g. DMS guardian recovery tokens (see vault.ts). */
+export function sha256Hex(input: string): string {
+  return bytesToHex(sha256(utf8ToBytes(input)));
+}
+
 export function deriveAccountId(masterKeyHex: string): string {
   const keyBytes = hexToBytes(masterKeyHex);
   try {
