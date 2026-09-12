@@ -47,6 +47,17 @@ export async function saveCategoryNote(
   await AsyncStorage.setItem(key(accountId, categoryId), JSON.stringify(stored));
 }
 
+/**
+ * Cheap existence check — doesn't need the master key, doesn't decrypt
+ * anything. Used by DashboardScreen's "memory status" card to count how
+ * many safes have a note saved, without doing 12 real decrypts just to
+ * show a count.
+ */
+export async function hasCategoryNote(accountId: string, categoryId: string): Promise<boolean> {
+  const raw = await AsyncStorage.getItem(key(accountId, categoryId));
+  return raw != null;
+}
+
 export async function loadCategoryNote(
   accountId: string,
   categoryId: string,

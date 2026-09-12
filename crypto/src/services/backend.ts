@@ -22,6 +22,8 @@ export interface AccountStatus {
   storageUsedBytes: number;
   dmsHeartbeatAt: string | null;
   dmsThresholdHours: number | null;
+  /** Used to compute the 1-year auto-delete date (Dashboard's "memory status" cards). */
+  lastActiveAt: string | null;
 }
 
 /**
@@ -32,7 +34,7 @@ export interface AccountStatus {
  */
 export async function getAccountStatus(accountId: string): Promise<AccountStatus> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/accounts?account_id=eq.${accountId}&select=storage_used_bytes,dms_heartbeat_at,dms_threshold_hours`,
+    `${SUPABASE_URL}/rest/v1/accounts?account_id=eq.${accountId}&select=storage_used_bytes,dms_heartbeat_at,dms_threshold_hours,last_active_at`,
     {
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -48,6 +50,7 @@ export async function getAccountStatus(accountId: string): Promise<AccountStatus
     storage_used_bytes: number;
     dms_heartbeat_at: string | null;
     dms_threshold_hours: number | null;
+    last_active_at: string | null;
   }> = await res.json();
 
   const row = rows[0];
@@ -55,6 +58,7 @@ export async function getAccountStatus(accountId: string): Promise<AccountStatus
     storageUsedBytes: row?.storage_used_bytes ?? 0,
     dmsHeartbeatAt: row?.dms_heartbeat_at ?? null,
     dmsThresholdHours: row?.dms_threshold_hours ?? null,
+    lastActiveAt: row?.last_active_at ?? null,
   };
 }
 

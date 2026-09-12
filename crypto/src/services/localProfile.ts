@@ -12,6 +12,8 @@ export interface RoomProfile {
   nickname: string;
   avatarId: string;
   themeId: string;
+  /** Optional — added after themeId; older saved profiles simply won't have it. See FontScaleContext.tsx. */
+  fontScaleId?: string;
 }
 
 const KEY_PREFIX = 'secret-chamber:profile:';

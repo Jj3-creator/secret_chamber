@@ -289,3 +289,27 @@ export function CandleIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/**
+ * Exit the room — a doorway with an arrow stepping out through it.
+ * Feedback: "icon รูปกุญแจ ... กลายเป็น ปุ่ม exit ซึ่งไม่สื่อความหมาย" — a
+ * padlock icon read as "manage a lock/key", not "leave the room". A door
+ * + outward arrow is the standard exit/log-out metaphor instead.
+ */
+export function DoorExitIcon(props: IconProps) {
+  const { size, color, strokeWidth } = base(props);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M13 4H7a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h6"
+        fill={withAlpha(color, 0.18)}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path d="M11 8 15 12l-4 4" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M9 12h9" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}

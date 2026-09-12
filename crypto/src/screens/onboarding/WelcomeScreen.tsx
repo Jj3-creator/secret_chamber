@@ -35,8 +35,8 @@ export function WelcomeScreen({ navigation }: Props) {
         <IconBadge size={60} style={styles.icon}>
           <VaultMarkIcon size={30} color={colors.textPrimary} />
         </IconBadge>
-        <Text style={styles.title}>ห้องแห่งความลับ</Text>
-        <Text style={styles.titleEn}>Secret Chamber</Text>
+        <Text style={styles.title}>ห้องแห่งความลับของฉัน</Text>
+        <Text style={styles.titleEn}>My Secret Chamber</Text>
         <Text style={styles.subtitle}>
           แอปนี้เก็บไฟล์ลับของคุณ โดยเข้ารหัสไว้ในมือถือคุณเองเท่านั้น{'\n'}
           ไม่มีใครเปิดดูได้ — แม้แต่คนสร้างแอปนี้ก็ตาม

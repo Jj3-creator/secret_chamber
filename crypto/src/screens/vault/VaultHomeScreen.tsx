@@ -17,15 +17,17 @@ import { IconBadge } from '../../components/IconBadge';
 import { ThemedBackground } from '../../components/ThemedBackground';
 import { SafeGraphic } from '../../components/SafeGraphic';
 import { appAlert } from '../../components/AppAlert';
-import { GearIcon, ChartIcon, PlusIcon, CheckCircleIcon, LockClosedIcon } from '../../components/icons';
+import { GearIcon, ChartIcon, PlusIcon, CheckCircleIcon, DoorExitIcon, DocumentIcon } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, sendHeartbeat, type AccountStatus } from '../../services/backend';
 import { loadRoomProfile, type RoomProfile } from '../../services/localProfile';
 import { recordCheckin, loadCheckinLog, type CheckinLog } from '../../services/checkinLog';
 import { loadGuardianContacts } from '../../services/guardianContacts';
 import { loadCategoryAccess } from '../../services/categoryAccess';
+import { loadAllCustomCategoryNames } from '../../services/customCategories';
 import { getAvatarComponent } from '../../components/avatars';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
+import { useFontScale } from '../../theme/FontScaleContext';
 import { CATEGORIES } from '../../data/categories';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'VaultHome'>;
@@ -35,6 +37,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // 6 real categories (Decoy Chamber deliberately excluded — see categories.ts)
 // + 6 blank custom slots = 12 total ("ครบโหล" per feedback).
 const CUSTOM_SLOT_COUNT = 6;
+const CUSTOM_SLOT_IDS = Array.from({ length: CUSTOM_SLOT_COUNT }, (_, i) => `custom-${i + 1}`);
 
 function formatMB(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1);
@@ -69,6 +72,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { accentColor, backgroundColor, setThemeId } = useRoomTheme();
+  const { setFontScaleId, scaled } = useFontScale();
 
   const load = useCallback(async () => {
     setError(null);
@@ -81,16 +85,18 @@ export function VaultHomeScreen({ route, navigation }: Props) {
       setStatus(accountStatus);
       setProfile(roomProfile);
       setCheckinLog(log);
-      // Restore the saved theme into the shared context — covers opening
-      // this screen fresh (e.g. a future direct re-entry/unlock flow)
-      // rather than relying on Personalize having just set it live.
+      // Restore the saved theme/font-size into the shared contexts —
+      // covers opening this screen fresh (e.g. a future direct
+      // re-entry/unlock flow) rather than relying on Personalize/Settings
+      // having just set it live.
       if (roomProfile?.themeId) setThemeId(roomProfile.themeId);
+      if (roomProfile?.fontScaleId) setFontScaleId(roomProfile.fontScaleId);
     } catch {
       setError('โหลดสถานะห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
     } finally {
       setLoading(false);
     }
-  }, [accountId, setThemeId]);
+  }, [accountId, setThemeId, setFontScaleId]);
 
   useEffect(() => {
     load();
@@ -102,6 +108,11 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   // back from CategoryDetailScreen after saving shows the new name
   // immediately, without needing a full remount.
   const [categoryAuthNames, setCategoryAuthNames] = useState<Record<string, string | null>>({});
+  // Custom slot (safes 7-12) names — feedback: "ตู้ที่ 7-12 ยังไม่เปิดให้
+  // ใส่ชื่อและข้อความ". Reloaded on focus too, same reason as above (a
+  // name just set in CategoryDetailScreen should show up immediately on
+  // returning here).
+  const [customNames, setCustomNames] = useState<Record<string, string | null>>({});
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -115,6 +126,8 @@ export function VaultHomeScreen({ route, navigation }: Props) {
           })
         );
         if (!cancelled) setCategoryAuthNames(Object.fromEntries(entries));
+        const customEntries = await loadAllCustomCategoryNames(accountId, CUSTOM_SLOT_IDS);
+        if (!cancelled) setCustomNames(customEntries);
       })();
       return () => {
         cancelled = true;
@@ -173,7 +186,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Avatar size={40} />
-          <Text style={styles.title}>{roomTitle}</Text>
+          <Text style={[styles.title, { fontSize: scaled(20) }]}>{roomTitle}</Text>
         </View>
         <View style={styles.headerRight}>
           <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Dashboard', { accountId })}>
@@ -183,7 +196,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            onPress={() => appAlert('ตั้งค่า', 'หน้าตั้งค่าจะพร้อมใช้งานเร็วๆ นี้')}
+            onPress={() => navigation.navigate('Settings', { accountId })}
           >
             <IconBadge size={40}>
               <GearIcon size={20} color={colors.textPrimary} />
@@ -191,7 +204,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
           </Pressable>
           <Pressable accessibilityRole="button" onPress={handleLockRoom}>
             <IconBadge size={40}>
-              <LockClosedIcon size={19} color={colors.textPrimary} />
+              <DoorExitIcon size={19} color={colors.textPrimary} />
             </IconBadge>
           </Pressable>
         </View>
@@ -213,10 +226,14 @@ export function VaultHomeScreen({ route, navigation }: Props) {
             </View>
           </View>
 
+          {/* Feedback: the old side-by-side row (long paragraph squeezed
+              next to the button) read badly on a narrow phone and made
+              the button hard to hit reliably. Stacked layout instead —
+              text on top, full-width button below, always reachable. */}
           <View style={[styles.card, styles.dmsCard]}>
             <View style={styles.dmsTextBlock}>
-              <Text style={styles.dmsTitle}>เช็คอินความปลอดภัย</Text>
-              <Text style={styles.dmsExplainer}>
+              <Text style={[styles.dmsTitle, { fontSize: scaled(16) }]}>เช็คอินความปลอดภัย</Text>
+              <Text style={[styles.dmsExplainer, { fontSize: scaled(15) }]}>
                 อย่าลืมกดปุ่ม Check in ทุกครั้ง เพื่อยืนยันว่า "ฉันยังอยู่และยังควบคุมข้อมูลของฉันเอง" หากคุณไม่กดปุ่มนี้ภายใน{' '}
                 {status?.dmsThresholdHours != null ? Math.round(status.dmsThresholdHours / 24) : '14'} วัน (ตามที่คุณเลือกในหน้าก่อน)
                 เราจะส่งรหัสกุญแจสำรองการเข้าห้องลับให้ตามชื่อที่ท่านระบุไว้ในหน้า "ระบุชื่อผู้รับรหัสกุญแจสำรอง"
@@ -239,7 +256,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
             ) : (
               <PrimaryButton
                 variant="secondary"
-                label={checkingIn ? '...' : 'เช็คอิน'}
+                label={checkingIn ? 'กำลังเช็คอิน…' : 'เช็คอิน'}
                 disabled={checkingIn || !dmsConfigured}
                 onPress={handleCheckIn}
                 style={styles.checkinButton}
@@ -267,7 +284,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                   <IconBadge size={36} tint={themeColor} style={styles.tileIcon}>
                     <Icon size={18} color={colors.textPrimary} />
                   </IconBadge>
-                  <Text style={styles.tileName} numberOfLines={2}>
+                  <Text style={[styles.tileName, { fontSize: scaled(13) }]} numberOfLines={2}>
                     {cat.nameTh}
                   </Text>
                   {/* Feedback: show who's authorized, but only when a
@@ -282,19 +299,39 @@ export function VaultHomeScreen({ route, navigation }: Props) {
               );
             })}
 
-            {Array.from({ length: CUSTOM_SLOT_COUNT }, (_, i) => {
+            {CUSTOM_SLOT_IDS.map((slotId, i) => {
               const safeNumber = CATEGORIES.length + i + 1;
+              const customName = customNames[slotId];
+              // Feedback: these 6 slots used to just show a "coming soon"
+              // alert — now they're real, nameable safes like the other
+              // 6, styled the same once named (or still visibly "empty"
+              // until then, tapping either way opens CategoryDetail).
               return (
                 <Pressable
-                  key={`custom-${safeNumber}`}
-                  style={[styles.tile, styles.tileEmpty]}
+                  key={slotId}
+                  style={[styles.tile, customName ? { borderColor: `${themeColor}55` } : styles.tileEmpty]}
                   accessibilityRole="button"
-                  onPress={() => appAlert('ตั้งชื่อตู้เซฟของคุณ', 'ฟีเจอร์สร้างหมวดของคุณเองจะพร้อมใช้งานเร็วๆ นี้')}
+                  onPress={() => navigation.navigate('CategoryDetail', { accountId, categoryId: slotId })}
                 >
-                  <SafeGraphic width={100} height={112} color={colors.textMuted} opacity={0.3} />
-                  <Text style={styles.tileEmptyNumber}>{safeNumber}</Text>
-                  <PlusIcon size={16} color={colors.textMuted} />
-                  <Text style={styles.tileEmptyLabel}>ว่าง — แตะเพื่อตั้งชื่อ</Text>
+                  {customName ? (
+                    <>
+                      <SafeGraphic width={100} height={112} color={themeColor} />
+                      <Text style={[styles.tileNumber, { color: themeColor }]}>{safeNumber}</Text>
+                      <IconBadge size={36} tint={themeColor} style={styles.tileIcon}>
+                        <DocumentIcon size={18} color={colors.textPrimary} />
+                      </IconBadge>
+                      <Text style={[styles.tileName, { fontSize: scaled(13) }]} numberOfLines={2}>
+                        {customName}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <SafeGraphic width={100} height={112} color={colors.textMuted} opacity={0.3} />
+                      <Text style={styles.tileEmptyNumber}>{safeNumber}</Text>
+                      <PlusIcon size={16} color={colors.textMuted} />
+                      <Text style={styles.tileEmptyLabel}>ว่าง — แตะเพื่อตั้งชื่อ</Text>
+                    </>
+                  )}
                 </Pressable>
               );
             })}
@@ -348,14 +385,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: colors.accentTeal, borderRadius: 3 },
-  dmsCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dmsTextBlock: { flex: 1, marginRight: spacing.md },
-  dmsTitle: { ...typography.body, fontSize: 16, color: colors.textPrimary, marginBottom: 2 },
-  dmsExplainer: { ...typography.body, fontSize: 16, color: colors.textSecondary, marginBottom: 4, lineHeight: 17 },
+  dmsCard: { flexDirection: 'column' },
+  dmsTextBlock: { marginBottom: spacing.md },
+  dmsTitle: { ...typography.body, fontSize: 16, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.xs },
+  dmsExplainer: { ...typography.body, fontSize: 15, color: colors.textSecondary, marginBottom: spacing.sm, lineHeight: 21 },
   dmsSubtitle: { ...typography.body, fontSize: 16, color: colors.textMuted },
   dmsHint: { ...typography.body, fontSize: 16, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' },
   checkinLogText: { ...typography.body, fontSize: 13, color: colors.textMuted, marginTop: 6 },
-  checkinButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minWidth: 88 },
+  checkinButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, width: '100%' },
   checkinSuccess: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -363,6 +400,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: 14,
     justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    width: '100%',
   },
   checkinSuccessText: { ...typography.label, fontSize: 14 },
   // 3-column grid of "safe" tiles (feedback: rows of text felt like a

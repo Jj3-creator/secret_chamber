@@ -64,7 +64,12 @@ export const CATEGORIES: CategoryRow[] = [
   },
   {
     id: 'livingwill',
-    nameTh: 'ความต้องการก่อนตาย',
+    // A space here (Thai has no spaces between words by default) gives
+    // the tile grid a guaranteed line-wrap point — without it, some
+    // mobile browsers rendered this whole compound word on one line and
+    // truncated it ("ตู้ที่ 6 ตัวหนังสืออ่านได้ไม่ครบ เห็นแค่
+    // 'ความต้องการ'") instead of wrapping to a second line.
+    nameTh: 'ความต้องการ ก่อนตาย',
     nameEn: 'Living Will',
     description: 'ความต้องการของคุณ หากวันหนึ่งคุณตัดสินใจเองไม่ได้',
     icon: CandleIcon,

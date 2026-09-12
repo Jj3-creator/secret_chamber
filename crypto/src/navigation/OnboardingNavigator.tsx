@@ -15,6 +15,7 @@ import { VaultHomeScreen } from '../screens/vault/VaultHomeScreen';
 import { DashboardScreen } from '../screens/vault/DashboardScreen';
 import { CategoryDetailScreen } from '../screens/vault/CategoryDetailScreen';
 import { ExitScreen } from '../screens/vault/ExitScreen';
+import { SettingsScreen } from '../screens/vault/SettingsScreen';
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
@@ -47,6 +48,8 @@ export type OnboardingStackParamList = {
   CategoryDetail: { accountId: string; categoryId: string };
   /** Exit / close-room confirmation page — reached from VaultHome's lock icon. See ExitScreen.tsx. */
   Exit: undefined;
+  /** Theme/font-size/notify-date settings — reached from VaultHome's sun icon. See SettingsScreen.tsx. */
+  Settings: { accountId: string };
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
@@ -76,6 +79,7 @@ export function OnboardingNavigator({ initialRouteName }: Props) {
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
         <Stack.Screen name="Exit" component={ExitScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
       </Stack.Navigator>
     </OnboardingProvider>
   );

@@ -32,6 +32,7 @@ import { CATEGORIES, getCategory } from '../../data/categories';
 import { loadGuardianContacts, type GuardianSetupRecord } from '../../services/guardianContacts';
 import { loadCategoryAccess, saveCategoryAccess, type CategoryAccess } from '../../services/categoryAccess';
 import { loadCategoryNote, saveCategoryNote } from '../../services/categoryNotes';
+import { loadCustomCategoryName, saveCustomCategoryName } from '../../services/customCategories';
 import {
   pickAndUploadFile,
   listFilesForCategory,
@@ -43,6 +44,7 @@ import {
   type BlobMeta,
 } from '../../services/categoryFiles';
 import { useVaultSession } from './VaultSessionContext';
+import { useFontScale } from '../../theme/FontScaleContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'CategoryDetail'>;
 
@@ -53,7 +55,13 @@ function accessKey(access: CategoryAccess): string {
 export function CategoryDetailScreen({ route, navigation }: Props) {
   const { accountId, categoryId } = route.params;
   const category = getCategory(categoryId);
+  // Feedback: "ตู้ที่ 7-12 ยังไม่เปิดให้ใส่ชื่อและข้อความ" — those 6 slots
+  // aren't in the static CATEGORIES list at all; they're user-named via
+  // customCategories.ts instead. Detected by id prefix (VaultHomeScreen
+  // always passes 'custom-1'..'custom-6' for them).
+  const isCustom = categoryId.startsWith('custom-');
   const { accentColor, backgroundColor } = useRoomTheme();
+  const { scaled } = useFontScale();
   const { masterKeyHex } = useVaultSession();
 
   const [guardians, setGuardians] = useState<GuardianSetupRecord | null>(null);
@@ -62,6 +70,8 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [savingAccess, setSavingAccess] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [savingName, setSavingName] = useState(false);
   const [files, setFiles] = useState<BlobMeta[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -90,6 +100,10 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
       if (cancelled) return;
       setGuardians(record);
       setAccess(savedAccess);
+      if (isCustom) {
+        const savedName = await loadCustomCategoryName(accountId, categoryId);
+        if (!cancelled) setCustomName(savedName ?? '');
+      }
       if (masterKeyHex) {
         const text = await loadCategoryNote(accountId, categoryId, masterKeyHex);
         if (!cancelled) setNote(text ?? '');
@@ -155,6 +169,16 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
     );
   };
 
+  const handleSaveName = async () => {
+    setSavingName(true);
+    try {
+      await saveCustomCategoryName(accountId, categoryId, customName);
+      appAlert('บันทึกแล้ว', 'บันทึกชื่อตู้เซฟนี้แล้ว');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   const handleSaveAccess = async () => {
     setSavingAccess(true);
     try {
@@ -176,7 +200,7 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
     }
   };
 
-  if (!category) {
+  if (!category && !isCustom) {
     // Shouldn't happen from normal navigation, but categoryId is just a
     // route param — guard against a stale/bad one rather than crash.
     return (
@@ -187,8 +211,13 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const Icon = category.icon;
-  const categoryIndex = CATEGORIES.findIndex((c) => c.id === categoryId);
+  const Icon = category?.icon ?? DocumentIcon;
+  // Static categories are numbered by their position in CATEGORIES (1-6);
+  // custom slots continue the sequence (7-12) based on their own slot
+  // number, e.g. 'custom-1' -> CATEGORIES.length + 1 = 7.
+  const categoryIndex = isCustom
+    ? CATEGORIES.length + (parseInt(categoryId.replace('custom-', ''), 10) || 1) - 1
+    : CATEGORIES.findIndex((c) => c.id === categoryId);
 
   return (
     <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
@@ -207,13 +236,37 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
               <IconBadge size={56} tint={accentColor}>
                 <Icon size={28} color={colors.textPrimary} />
               </IconBadge>
-              <Text style={styles.categoryName}>
-                {category.nameTh} <Text style={styles.categoryNameEn}>({category.nameEn})</Text>
-              </Text>
-              <Text style={styles.categoryDescription}>{category.description}</Text>
+              {isCustom ? (
+                // Feedback: safes 7-12 are user-defined topics — let the
+                // owner name (and rename) this one right here, instead of
+                // a placeholder alert.
+                <>
+                  <TextInput
+                    value={customName}
+                    onChangeText={setCustomName}
+                    placeholder="ตั้งชื่อตู้เซฟนี้ เช่น รหัสผ่านสำคัญ, สัญญาต่างๆ"
+                    placeholderTextColor={colors.textMuted}
+                    style={styles.nameInput}
+                  />
+                  <PrimaryButton
+                    variant="secondary"
+                    label={savingName ? 'กำลังบันทึก…' : 'บันทึกชื่อ'}
+                    onPress={handleSaveName}
+                    disabled={savingName || !customName.trim()}
+                    style={styles.saveNameButton}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.categoryName, { fontSize: scaled(17) }]}>
+                    {category!.nameTh} <Text style={styles.categoryNameEn}>({category!.nameEn})</Text>
+                  </Text>
+                  <Text style={[styles.categoryDescription, { fontSize: scaled(14) }]}>{category!.description}</Text>
+                </>
+              )}
             </View>
 
-            <Text style={styles.sectionLabel}>เนื้อหาในตู้เซฟนี้</Text>
+            <Text style={[styles.sectionLabel, { fontSize: scaled(16) }]}>เนื้อหาในตู้เซฟนี้</Text>
             {!masterKeyHex ? (
               <View style={styles.noteBox}>
                 <Text style={styles.noteText}>ต้องปลดล็อกห้องด้วย PIN ก่อนถึงจะดู/บันทึกเนื้อหาในตู้เซฟนี้ได้</Text>
@@ -286,7 +339,7 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
               </>
             )}
 
-            <Text style={styles.sectionLabel}>ผู้มีสิทธิ์เข้าถึงตู้เซฟนี้</Text>
+            <Text style={[styles.sectionLabel, { fontSize: scaled(16) }]}>ผู้มีสิทธิ์เข้าถึงตู้เซฟนี้</Text>
             {loading ? null : !guardians || guardians.guardians.length === 0 ? (
               <View style={styles.noteBox}>
                 <Text style={styles.noteText}>
@@ -356,6 +409,19 @@ const styles = StyleSheet.create({
   categoryName: { ...typography.body, fontSize: 17, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
   categoryNameEn: { fontWeight: '400', color: colors.textMuted, fontSize: 14 },
   categoryDescription: { ...typography.body, fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  nameInput: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    ...typography.body,
+    fontSize: 16,
+  },
+  saveNameButton: { width: '100%', marginTop: spacing.xs },
   whiteboard: {
     borderWidth: 1,
     borderColor: colors.border,

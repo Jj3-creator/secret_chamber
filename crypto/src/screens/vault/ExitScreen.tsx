@@ -17,7 +17,7 @@ import type { OnboardingStackParamList } from '../../navigation/OnboardingNaviga
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
 import { ThemedBackground } from '../../components/ThemedBackground';
-import { LockClosedIcon } from '../../components/icons';
+import { DoorExitIcon } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
 import { useVaultSession } from './VaultSessionContext';
@@ -51,7 +51,7 @@ export function ExitScreen({ navigation }: Props) {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             <View style={styles.iconWrap}>
               <IconBadge size={64} tint={accentColor}>
-                <LockClosedIcon size={30} color={colors.textPrimary} />
+                <DoorExitIcon size={30} color={colors.textPrimary} />
               </IconBadge>
             </View>
             <Text style={styles.title}>ปิดห้องลับ</Text>

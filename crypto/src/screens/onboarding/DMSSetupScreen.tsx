@@ -18,6 +18,12 @@
 // their dms-request-share call AND (via deriveMasterKey) derives the key
 // that unwraps their share. Knowing the token is sufficient and necessary;
 // nothing else to set up on the guardian's side.
+//
+// Feedback: the old dynamic "add a guardian" flow (a button that appended
+// a new card below the fold) was unreachable on real mobile touch
+// scrolling. Replaced with 3 always-rendered, clearly separate boxes
+// (slot 1 required, 2/3 marked optional) — no add/remove interaction, no
+// content that appears somewhere requiring a scroll to discover.
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TextInput, Pressable, ScrollView, Switch } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -82,7 +88,11 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   // yet. Kept as a separate, honestly-labeled toggle rather than silently
   // ignored, so the choice is at least recorded for when that's built.
   const [notifyEnabled, setNotifyEnabled] = useState(true);
-  const [guardians, setGuardians] = useState<Guardian[]>([emptyGuardian()]);
+  // Always exactly 3 slots, rendered as 3 separate boxes — slot 1 is the
+  // only one that must actually have a name; 2/3 are optional and simply
+  // ignored (not sent, not counted) if left blank. See the file header
+  // comment for why this replaced the old dynamic add/remove list.
+  const [guardians, setGuardians] = useState<Guardian[]>([emptyGuardian(), emptyGuardian(), emptyGuardian()]);
   // Feedback: simplified from a "pick a number from 2..N" slider to a
   // plain binary choice — 'any' means one guardian's confirmation alone
   // is enough (OR); 'all' means every single guardian must confirm
@@ -92,14 +102,12 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [revealed, setRevealed] = useState<RevealedGuardian[] | null>(null);
 
-  const addGuardian = () => {
-    if (guardians.length < MAX_GUARDIANS) setGuardians((prev) => [...prev, emptyGuardian()]);
-  };
-  const removeGuardian = (i: number) => {
-    if (guardians.length > MIN_GUARDIANS) setGuardians((prev) => prev.filter((_, idx) => idx !== i));
-  };
   const updateGuardian = (i: number, field: keyof Guardian, value: string) =>
     setGuardians((prev) => prev.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
+
+  // The guardians that actually count — slot 2/3 left blank simply don't
+  // participate, no explicit "remove" action needed.
+  const activeGuardians = guardians.filter((g) => g.name.trim().length > 0);
 
   const finish = () => {
     // Carry the real key into VaultSessionContext before OnboardingContext
@@ -117,9 +125,9 @@ export function DMSSetupScreen({ navigation, route }: Props) {
       appAlert('ผิดพลาด', 'ไม่พบกุญแจสำหรับตั้งค่า — ลองเริ่มใหม่จากขั้นตอนสร้างห้อง');
       return;
     }
-    const names = guardians.map((g) => g.name.trim());
-    if (names.some((n) => !n) || names.length < MIN_GUARDIANS) {
-      appAlert('กรอกไม่ครบ', `ใส่ชื่อผู้ถือกุญแจสำรองอย่างน้อย ${MIN_GUARDIANS} คน`);
+    const names = activeGuardians.map((g) => g.name.trim());
+    if (names.length < MIN_GUARDIANS) {
+      appAlert('กรอกไม่ครบ', `ใส่ชื่อผู้ถือกุญแจสำรองอย่างน้อย ${MIN_GUARDIANS} คน (ช่องที่ 1)`);
       return;
     }
     if (!notifyConsent) {
@@ -177,7 +185,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
       // guardianContacts.ts). Used later to let the owner pick which
       // guardians can access which safe.
       await saveGuardianContacts(accountId, {
-        guardians: guardians.map((g) => ({
+        guardians: activeGuardians.map((g) => ({
           name: g.name.trim(),
           email: g.email.trim() || undefined,
           lineId: g.lineId.trim() || undefined,
@@ -246,11 +254,11 @@ export function DMSSetupScreen({ navigation, route }: Props) {
         <Text style={styles.title}>กุญแจไขความลับสำหรับทายาท (ไม่บังคับ)</Text>
         <Text style={styles.subtitle}>
           กุญแจนี้จะถูกส่งให้คนที่คุณระบุตัวตนไว้ (ทายาท/คนที่คุณไว้ใจ) ก็ต่อเมื่อห้องของคุณขาดการเช็คอินเกินเวลาที่คุณกำหนด
-          {guardians.length <= 1
+          {activeGuardians.length <= 1
             ? ' (มีผู้ถือกุญแจแค่คนเดียว คนนั้นจึงกู้คืนได้ทันทีด้วยรหัสของตัวเอง — ไม่มีใครช่วยตรวจสอบถ่วงดุล แนะนำให้เพิ่มเป็น 2-3 คนเพื่อความปลอดภัย)'
             : verifyMode === 'all'
-              ? ` (ต้องได้รับความยินยอมจากทุกคนทั้ง ${guardians.length} คน — ปลอดภัยที่สุด แต่ถ้าติดต่อใครคนหนึ่งไม่ได้ก็กู้คืนไม่ได้)`
-              : ` (แค่คนใดคนหนึ่งใน ${guardians.length} คนก็กู้คืนได้ — สะดวกกว่า แต่ทายาทคนใดคนหนึ่งก็สามารถกู้คืนคนเดียวได้เช่นกัน)`}
+              ? ` (ต้องได้รับความยินยอมจากทุกคนทั้ง ${activeGuardians.length} คน — ปลอดภัยที่สุด แต่ถ้าติดต่อใครคนหนึ่งไม่ได้ก็กู้คืนไม่ได้)`
+              : ` (แค่คนใดคนหนึ่งใน ${activeGuardians.length} คนก็กู้คืนได้ — สะดวกกว่า แต่ทายาทคนใดคนหนึ่งก็สามารถกู้คืนคนเดียวได้เช่นกัน)`}
         </Text>
 
         <View style={styles.toggleRow}>
@@ -298,22 +306,22 @@ export function DMSSetupScreen({ navigation, route }: Props) {
             </View>
 
             <Text style={styles.fieldLabel}>ผู้ถือกุญแจสำรอง ({MIN_GUARDIANS}-{MAX_GUARDIANS} คน)</Text>
+            <Text style={styles.contactNote}>
+              ช่องที่ 1 จำเป็นต้องใส่ — ช่องที่ 2 และ 3 ไม่บังคับ เว้นว่างไว้ได้ถ้าไม่ต้องการ เก็บอีเมล/LINE ไว้ในเครื่องนี้เท่านั้น
+              (ไม่ส่งขึ้น server) — ใช้อีเมลหรือ LINE แทนเบอร์โทร เพราะเชื่อมต่อแจ้งเตือนได้โดยไม่มีค่าใช้จ่ายเมื่อฟีเจอร์นี้เปิดใช้งานในอนาคต
+            </Text>
             {guardians.map((guardian, i) => (
               <View key={i} style={styles.guardianCard}>
-                <View style={styles.guardianRow}>
-                  <TextInput
-                    value={guardian.name}
-                    onChangeText={(v) => updateGuardian(i, 'name', v)}
-                    placeholder={`ชื่อผู้ถือกุญแจสำรอง คนที่ ${i + 1}`}
-                    placeholderTextColor={colors.textMuted}
-                    style={styles.input}
-                  />
-                  {guardians.length > MIN_GUARDIANS && (
-                    <Pressable onPress={() => removeGuardian(i)} accessibilityRole="button" style={styles.removeButton}>
-                      <Text style={styles.removeButtonText}>ลบ</Text>
-                    </Pressable>
-                  )}
-                </View>
+                <Text style={styles.guardianCardTitle}>
+                  ผู้รับรหัสลำดับที่ {i + 1} {i === 0 ? '(จำเป็น)' : '(ไม่บังคับ)'}
+                </Text>
+                <TextInput
+                  value={guardian.name}
+                  onChangeText={(v) => updateGuardian(i, 'name', v)}
+                  placeholder={`ชื่อผู้รับรหัสลำดับที่ ${i + 1}`}
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.input}
+                />
                 <View style={styles.guardianRow}>
                   <TextInput
                     value={guardian.email}
@@ -334,17 +342,8 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                 </View>
               </View>
             ))}
-            <Text style={styles.contactNote}>
-              เก็บอีเมล/LINE ไว้ในเครื่องนี้เท่านั้น (ไม่ส่งขึ้น server) — ใช้อีเมลหรือ LINE แทนเบอร์โทร เพราะเชื่อมต่อแจ้งเตือนได้โดยไม่มีค่าใช้จ่าย
-              เมื่อฟีเจอร์นี้เปิดใช้งานในอนาคต
-            </Text>
-            {guardians.length < MAX_GUARDIANS && (
-              <Pressable onPress={addGuardian} accessibilityRole="button" style={styles.addLink}>
-                <Text style={styles.addLinkText}>+ เพิ่มผู้ถือกุญแจสำรอง</Text>
-              </Pressable>
-            )}
 
-            {guardians.length >= 2 && (
+            {activeGuardians.length >= 2 && (
               <>
                 <Text style={styles.fieldLabel}>วิธียืนยันร่วมกัน</Text>
                 <View style={styles.periodRow}>
@@ -371,7 +370,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                 </View>
                 <Text style={styles.periodExplainer}>
                   {verifyMode === 'all'
-                    ? `เลือก "ทุกคนร่วมกัน" (AND) — หมายความว่าคุณตั้งผู้รับกุญแจสำรองไว้ ${guardians.length} คน ต้องใช้รหัสยืนยันครบทั้ง ${guardians.length} คนจึงจะเปิดห้องได้ ปลอดภัยสูงสุด แต่ถ้ามีใครติดต่อไม่ได้แม้แต่คนเดียว จะกู้คืนไม่ได้เลย`
+                    ? `เลือก "ทุกคนร่วมกัน" (AND) — หมายความว่าคุณตั้งผู้รับกุญแจสำรองไว้ ${activeGuardians.length} คน ต้องใช้รหัสยืนยันครบทั้ง ${activeGuardians.length} คนจึงจะเปิดห้องได้ ปลอดภัยสูงสุด แต่ถ้ามีใครติดต่อไม่ได้แม้แต่คนเดียว จะกู้คืนไม่ได้เลย`
                     : `เลือก "คนใดคนหนึ่ง" (OR) — แค่คนใดคนหนึ่งในผู้รับกุญแจสำรองที่ตั้งไว้ยืนยันก็เปิดห้องได้ทันที สะดวกกว่า แต่ทายาทคนใดคนหนึ่งก็สามารถกู้คืนคนเดียวได้เช่นกัน โดยไม่ต้องรอคนอื่น`}
                 </Text>
               </>
@@ -464,10 +463,7 @@ const styles = StyleSheet.create({
   },
   inputHalf: { fontSize: 14 },
   contactNote: { ...typography.body, fontSize: 13, color: colors.textMuted, fontStyle: 'italic', marginBottom: spacing.lg },
-  removeButton: { paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
-  removeButtonText: { ...typography.body, fontSize: 15, color: colors.dangerText },
-  addLink: { marginBottom: spacing.lg },
-  addLinkText: { ...typography.body, fontSize: 16, color: colors.accentTeal },
+  guardianCardTitle: { ...typography.label, fontSize: 15, color: colors.textMuted },
   noteBox: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: spacing.md, marginBottom: spacing.lg },
   noteText: { ...typography.body, fontSize: 16, color: colors.textMuted, lineHeight: 18 },
   footer: { gap: spacing.sm },
