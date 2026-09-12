@@ -13,25 +13,77 @@ Kept in its own folder, independent of [`crypto`](../crypto) (Part 1).
 backend/
 └── supabase/
     ├── migrations/
-    │   └── 0001_init_schema.sql   # accounts + blobs tables, RLS policies
+    │   ├── 0001_init_schema.sql     # accounts + blobs tables, RLS policies
+    │   └── 0002_dms_heartbeat.sql   # Dead Man's Switch heartbeat + guardian shares
     └── functions/
-        └── get-upload-url/
-            ├── index.ts           # presigned R2 PUT URL, 100MB cap
+        ├── _shared/
+        │   └── http.ts              # CORS/json/sha256 helpers (used by the dms-* functions)
+        ├── get-upload-url/
+        │   ├── index.ts             # presigned R2 PUT URL, 100MB cap
+        │   └── deno.json
+        ├── dms-setup/
+        │   ├── index.ts             # register threshold_hours + wrapped guardian shares
+        │   └── deno.json
+        ├── dms-heartbeat/
+        │   ├── index.ts             # "I'm still here" check-in, pushes back the switch
+        │   └── deno.json
+        └── dms-request-share/
+            ├── index.ts             # a guardian retrieves their wrapped share, once eligible
             └── deno.json
 ```
 
 ## Schema summary
 
 - **`accounts`**: `account_id` (PK, hex SHA-256), `created_at`,
-  `last_active_at`, `storage_used_bytes`.
+  `last_active_at`, `storage_used_bytes`, `dms_heartbeat_at`,
+  `dms_threshold_hours` (the latter two `NULL` until DMS is set up).
 - **`blobs`**: `blob_id` (PK, uuid), `account_id` (FK), `file_size_bytes`
   (checked `<= 100MB`), `created_at`.
-- RLS is enabled on both tables. See the comment block in
-  [`0001_init_schema.sql`](supabase/migrations/0001_init_schema.sql) for the
-  threat model: the primary access-control boundary is that all writes go
-  through the `get-upload-url` function running as `service_role` (which
-  bypasses RLS); the `x-account-id`-header policies are a secondary,
-  defense-in-depth layer for any direct table reads.
+- **`dms_guardians`**: one row per trusted contact holding one Shamir
+  share — `account_id` (FK), `share_index` (1..255, matches
+  `vault.ts`'s `ShamirShare.index`), `token_hash` (SHA-256 of a random
+  recovery token given to that guardian out-of-band), `wrapped_cipher_text`
+  + `wrapped_iv` (the share, AES-256-GCM-wrapped client-side under a key
+  only that guardian can derive — the server never sees a usable share).
+- RLS is enabled on all three tables. See the comment blocks in
+  [`0001_init_schema.sql`](supabase/migrations/0001_init_schema.sql) and
+  [`0002_dms_heartbeat.sql`](supabase/migrations/0002_dms_heartbeat.sql) for
+  the threat model: the primary access-control boundary is that all writes
+  go through Edge Functions running as `service_role` (which bypasses RLS);
+  `dms_guardians` has no anon/authenticated policies at all — it's reachable
+  only via `dms-setup` / `dms-request-share`.
+
+## Dead Man's Switch (DMS) — how the three functions fit together
+
+```
+Owner, periodically:        POST dms-heartbeat  { account_id }
+                             → pushes dms_heartbeat_at to now()
+
+Owner, once, at setup:      POST dms-setup      { account_id, threshold_hours,
+                                                   guardians: [{ share_index, token_hash, wrapped }, ...] }
+                             → stores the wrapped shares + starts the clock
+
+Guardian, after silence:    POST dms-request-share { account_id, share_index, token }
+                             → 403 not_yet_eligible  until  now() >= dms_heartbeat_at + dms_threshold_hours
+                             → 200 { wrapped }        once eligible (still ciphertext!)
+```
+
+The client-side pieces (splitting the key, wrapping/unwrapping each share,
+generating recovery tokens) are `vault.ts`'s `createRecoveryShares` /
+`recoverMasterKeyFromShares` plus its `wrapVaultKey` / `unwrapVaultKey` —
+reused as-is, since a Shamir share is just another hex string to wrap under
+a key. A recovery token is any sufficiently random string the owner
+generates and hands to that guardian out-of-band (print it, say it aloud —
+never send it through this backend); the server only ever stores its hash.
+
+**What's server-enforced vs. not:** the *timing* gate (`not_yet_eligible`
+until the heartbeat has actually expired, checked against the server's own
+clock) is real and can't be bypassed by a lying client. What's **not**
+server-enforced — by design, to keep the zero-knowledge property — is
+reconstruction itself: once 2 guardians have both received their wrapped
+shares and each has unwrapped theirs locally, nothing stops them combining
+right there on a guardian's device. The server never sees the plaintext
+shares or the reconstructed key at any point.
 
 ## Prerequisites
 
@@ -69,12 +121,15 @@ R2 → Manage API Tokens) with Object Read & Write permissions on that bucket.
    supabase secrets set --env-file .env
    ```
 
-4. **Deploy the function.** Because this app has no Supabase Auth session
+4. **Deploy the functions.** Because this app has no Supabase Auth session
    (zero-knowledge, no login), pass `--no-verify-jwt` so calls authenticated
    only by the anon API key are accepted:
 
    ```bash
    supabase functions deploy get-upload-url --no-verify-jwt
+   supabase functions deploy dms-setup --no-verify-jwt
+   supabase functions deploy dms-heartbeat --no-verify-jwt
+   supabase functions deploy dms-request-share --no-verify-jwt
    ```
 
 5. **Smoke test:**
@@ -90,11 +145,19 @@ R2 → Manage API Tokens) with Object Read & Write permissions on that bucket.
    Expect a `200` with `{ blob_id, upload_url, object_key, expires_in }`.
    A `file_size_bytes` over `104857600` should come back `413 file_too_large`.
 
+   For the DMS functions, `dms-request-share` should come back
+   `403 not_yet_eligible` immediately after `dms-setup`/`dms-heartbeat`
+   (the whole point), and only return the wrapped share once
+   `threshold_hours` has actually elapsed.
+
 ## Local development
 
 ```bash
 supabase start                # local Postgres + Studio
 supabase functions serve get-upload-url --env-file .env --no-verify-jwt
+supabase functions serve dms-setup --env-file .env --no-verify-jwt
+supabase functions serve dms-heartbeat --env-file .env --no-verify-jwt
+supabase functions serve dms-request-share --env-file .env --no-verify-jwt
 ```
 
 ## Notes / things to revisit before production
@@ -104,6 +167,16 @@ supabase functions serve get-upload-url --env-file .env --no-verify-jwt
 - **Per-account quota**: `storage_used_bytes` is tracked but not currently
   enforced as a hard cap — add a check against a quota constant in
   `index.ts` if you want to reject uploads once an account exceeds it.
-- **Rate limiting**: the function has no rate limiting of its own; put it
+- **Rate limiting**: none of the functions rate-limit themselves; put them
   behind Supabase's platform-level rate limits or a WAF rule if abuse
-  becomes a concern.
+  becomes a concern — `dms-request-share` in particular is a token-guessing
+  target and would benefit from one.
+- **`dms-setup` replace-all semantics**: re-running it for an account wipes
+  and replaces that account's entire guardian set (see the comment in
+  `dms-setup/index.ts`). Fine for "redo my DMS setup"; not something to call
+  incidentally.
+- **No push/email/SMS to guardians**: this backend never contacts a
+  guardian on the owner's behalf — recovery tokens are handed over
+  out-of-band by the owner. Notifying guardians that they're now eligible
+  to request their share (rather than them polling `dms-request-share`)
+  isn't built.
