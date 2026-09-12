@@ -135,3 +135,145 @@ export async function getActivityLog(accountId: string, limit = 20): Promise<Act
     await res.json();
   return rows.map((r) => ({ eventType: r.event_type, detail: r.detail, createdAt: r.created_at }));
 }
+
+// ---------------------------------------------------------------------------
+// Part 3 — per-safe file attachments (items 12/13's "whiteboard", file half)
+// ---------------------------------------------------------------------------
+// Real ciphertext goes straight to Cloudflare R2 via presigned URLs — never
+// through this backend's own request/response bodies. What DOES pass
+// through here: opaque encrypted bytes (PUT/GET) and metadata rows that are
+// display-only from the server's point of view (file_name/mime_type are
+// never used to interpret the ciphertext). See categoryFiles.ts for the
+// client-side encrypt-before-upload / decrypt-after-download half.
+
+export interface UploadUrlResult {
+  blobId: string;
+  uploadUrl: string;
+  expiresIn: number;
+}
+
+export async function getUploadUrl(
+  accountId: string,
+  fileSizeBytes: number,
+  categoryId: string,
+  fileName: string,
+  mimeType: string
+): Promise<UploadUrlResult> {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/get-upload-url`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      account_id: accountId,
+      file_size_bytes: fileSizeBytes,
+      category_id: categoryId,
+      file_name: fileName,
+      mime_type: mimeType,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(`getUploadUrl: ${res.status} ${body?.error ?? ''}`);
+  }
+  const body = await res.json();
+  return { blobId: body.blob_id, uploadUrl: body.upload_url, expiresIn: body.expires_in };
+}
+
+/** PUTs already-encrypted bytes straight to R2 via the presigned URL from getUploadUrl(). */
+export async function uploadEncryptedBytes(uploadUrl: string, bytes: Uint8Array): Promise<void> {
+  const res = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: bytes,
+  });
+  if (!res.ok) throw new Error(`uploadEncryptedBytes: unexpected ${res.status}`);
+}
+
+export interface DownloadUrlResult {
+  downloadUrl: string;
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+}
+
+export async function getDownloadUrl(accountId: string, blobId: string): Promise<DownloadUrlResult> {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/get-download-url`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account_id: accountId, blob_id: blobId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(`getDownloadUrl: ${res.status} ${body?.error ?? ''}`);
+  }
+  const body = await res.json();
+  return {
+    downloadUrl: body.download_url,
+    fileName: body.file_name,
+    mimeType: body.mime_type,
+    fileSizeBytes: body.file_size_bytes,
+  };
+}
+
+/** GETs the still-encrypted bytes from R2 via the presigned URL from getDownloadUrl(). */
+export async function downloadEncryptedBytes(downloadUrl: string): Promise<Uint8Array> {
+  const res = await fetch(downloadUrl);
+  if (!res.ok) throw new Error(`downloadEncryptedBytes: unexpected ${res.status}`);
+  const buf = await res.arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+export interface BlobMeta {
+  blobId: string;
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  createdAt: string;
+}
+
+/** Lists this account's file rows for one safe — direct PostgREST read, same RLS pattern as getActivityLog. */
+export async function listCategoryBlobs(accountId: string, categoryId: string): Promise<BlobMeta[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/blobs?account_id=eq.${accountId}&category_id=eq.${categoryId}&select=blob_id,file_name,mime_type,file_size_bytes,created_at&order=created_at.desc`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'x-account-id': accountId,
+      },
+    }
+  );
+  if (!res.ok) throw new Error(`listCategoryBlobs: unexpected ${res.status}`);
+  const rows: Array<{
+    blob_id: string;
+    file_name: string;
+    mime_type: string;
+    file_size_bytes: number;
+    created_at: string;
+  }> = await res.json();
+  return rows.map((r) => ({
+    blobId: r.blob_id,
+    fileName: r.file_name,
+    mimeType: r.mime_type,
+    fileSizeBytes: r.file_size_bytes,
+    createdAt: r.created_at,
+  }));
+}
+
+/**
+ * Removes a file's metadata row (direct PostgREST delete, gated by the
+ * blobs_delete_own RLS policy). Note: this does NOT delete the underlying
+ * R2 object — cleaning up the orphaned ciphertext is an operational task,
+ * not exposed to the client, same as account deletion (see
+ * 0001_init_schema.sql's own comment on that).
+ */
+export async function deleteBlobRecord(accountId: string, blobId: string): Promise<void> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/blobs?blob_id=eq.${blobId}`, {
+    method: 'DELETE',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      'x-account-id': accountId,
+    },
+  });
+  if (!res.ok) throw new Error(`deleteBlobRecord: unexpected ${res.status}`);
+}

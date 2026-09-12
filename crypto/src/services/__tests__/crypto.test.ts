@@ -4,6 +4,8 @@ import {
   deriveAccountId,
   encryptData,
   decryptData,
+  encryptBytes,
+  decryptBytes,
   __internal,
 } from '../crypto';
 
@@ -116,6 +118,45 @@ describe('encryptData / decryptData round-trip', () => {
 
     const { cipherText, iv } = await encryptData('top secret', keyA);
     await expect(decryptData(cipherText, iv, keyB)).rejects.toThrow();
+  });
+});
+
+describe('encryptBytes / decryptBytes round-trip (file attachments)', () => {
+  it('decrypts back to the original bytes', async () => {
+    const { masterKeyHex } = await deriveMasterKey('file attachment round trip test');
+    const original = new Uint8Array([0, 1, 2, 255, 254, 128, 64, 32, 16, 8, 4, 2, 1, 0]);
+
+    const combined = await encryptBytes(original, masterKeyHex);
+    const decrypted = await decryptBytes(combined, masterKeyHex);
+
+    expect(Array.from(decrypted)).toEqual(Array.from(original));
+  });
+
+  it('round-trips an empty byte array', async () => {
+    const { masterKeyHex } = await deriveMasterKey('empty bytes edge case');
+    const combined = await encryptBytes(new Uint8Array(0), masterKeyHex);
+    const decrypted = await decryptBytes(combined, masterKeyHex);
+    expect(decrypted.length).toBe(0);
+  });
+
+  it('prepends a unique IV each call, so identical bytes never produce identical output', async () => {
+    const { masterKeyHex } = await deriveMasterKey('file iv uniqueness test');
+    const data = new Uint8Array([9, 9, 9]);
+    const a = await encryptBytes(data, masterKeyHex);
+    const b = await encryptBytes(data, masterKeyHex);
+    expect(Array.from(a)).not.toEqual(Array.from(b));
+  });
+
+  it('fails to decrypt with the wrong key', async () => {
+    const keyA = (await deriveMasterKey('file key A')).masterKeyHex;
+    const keyB = (await deriveMasterKey('file key B')).masterKeyHex;
+    const combined = await encryptBytes(new Uint8Array([1, 2, 3]), keyA);
+    await expect(decryptBytes(combined, keyB)).rejects.toThrow();
+  });
+
+  it('rejects a buffer too short to contain an IV', async () => {
+    const { masterKeyHex } = await deriveMasterKey('short buffer test');
+    await expect(decryptBytes(new Uint8Array([1, 2, 3]), masterKeyHex)).rejects.toThrow();
   });
 
   it('fails to decrypt if the ciphertext was tampered with', async () => {

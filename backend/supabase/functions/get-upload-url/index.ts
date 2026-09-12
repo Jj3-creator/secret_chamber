@@ -39,7 +39,14 @@ function json(body: unknown, status = 200): Response {
 interface RequestBody {
   account_id?: unknown;
   file_size_bytes?: unknown;
+  category_id?: unknown;
+  file_name?: unknown;
+  mime_type?: unknown;
 }
+
+const MAX_FILE_NAME_LENGTH = 255;
+const MAX_MIME_TYPE_LENGTH = 127;
+const MAX_CATEGORY_ID_LENGTH = 64;
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
@@ -52,7 +59,7 @@ serve(async (req: Request) => {
     return json({ error: 'invalid_json' }, 400);
   }
 
-  const { account_id, file_size_bytes } = body;
+  const { account_id, file_size_bytes, category_id, file_name, mime_type } = body;
 
   if (typeof account_id !== 'string' || !ACCOUNT_ID_RE.test(account_id)) {
     return json({ error: 'invalid_account_id', detail: 'expected a 64-char hex SHA-256 digest' }, 400);
@@ -69,6 +76,19 @@ serve(async (req: Request) => {
       { error: 'file_too_large', max_bytes: MAX_FILE_SIZE_BYTES, given_bytes: file_size_bytes },
       413
     );
+  }
+  // All three optional — display-only metadata, never trusted as real
+  // content-type/size (see the migration's comment on these columns).
+  if (category_id !== undefined && category_id !== null) {
+    if (typeof category_id !== 'string' || category_id.length > MAX_CATEGORY_ID_LENGTH) {
+      return json({ error: 'invalid_category_id' }, 400);
+    }
+  }
+  if (file_name !== undefined && (typeof file_name !== 'string' || file_name.length > MAX_FILE_NAME_LENGTH)) {
+    return json({ error: 'invalid_file_name' }, 400);
+  }
+  if (mime_type !== undefined && (typeof mime_type !== 'string' || mime_type.length > MAX_MIME_TYPE_LENGTH)) {
+    return json({ error: 'invalid_mime_type' }, 400);
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -134,6 +154,9 @@ serve(async (req: Request) => {
     blob_id: blobId,
     account_id,
     file_size_bytes,
+    category_id: category_id ?? null,
+    file_name: file_name ?? '',
+    mime_type: mime_type ?? 'application/octet-stream',
   });
 
   if (blobInsertError) {

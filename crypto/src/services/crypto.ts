@@ -300,6 +300,45 @@ export async function decryptData(
   }
 }
 
+/**
+ * Binary counterpart to encryptData() — for file attachments (item 13's
+ * "whiteboard" — file half) rather than short text notes. Returns a single
+ * buffer with the 12-byte IV prepended to the ciphertext (IV || ciphertext),
+ * so there's no separate metadata field to keep track of — the whole
+ * returned buffer is exactly what gets uploaded as the object body, and
+ * exactly what decryptBytes() expects back.
+ */
+export async function encryptBytes(data: Uint8Array, masterKeyHex: string): Promise<Uint8Array> {
+  const key = hexToBytes(masterKeyHex);
+  const iv = await ExpoCrypto.getRandomBytesAsync(IV_BYTES);
+  let ciphertext: Uint8Array | null = null;
+  try {
+    ciphertext = gcm(key, iv).encrypt(data);
+    const combined = new Uint8Array(iv.length + ciphertext.length);
+    combined.set(iv, 0);
+    combined.set(ciphertext, iv.length);
+    return combined;
+  } finally {
+    wipe(key);
+    wipe(iv);
+    wipe(ciphertext);
+  }
+}
+
+/** Decrypts a buffer produced by encryptBytes(). Throws if the auth tag doesn't verify. */
+export async function decryptBytes(combined: Uint8Array, masterKeyHex: string): Promise<Uint8Array> {
+  if (combined.length < IV_BYTES) throw new Error('decryptBytes: buffer too short to contain an IV');
+  const key = hexToBytes(masterKeyHex);
+  const iv = combined.slice(0, IV_BYTES);
+  const ciphertext = combined.slice(IV_BYTES);
+  try {
+    return gcm(key, iv).decrypt(ciphertext);
+  } finally {
+    wipe(key);
+    wipe(iv);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 6. Zero memory traces — explicit wipe for callers holding key material
 // ---------------------------------------------------------------------------

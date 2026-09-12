@@ -7,35 +7,41 @@
 //
 // What's real: loading this safe's name/description (data/categories.ts),
 // loading/saving which single guardian (if any) is authorized for it
-// (categoryAccess.ts, local-only), and a REAL encrypted text note per
-// safe — encrypted with the actual room master key (crypto.ts's
-// encryptData/decryptData) via VaultSessionContext, stored locally.
-//
-// What's NOT real yet: file attachments (Word/PDF/PNG/JPEG/HTML/...) —
-// that needs a file-picker dependency this session doesn't have yet,
-// plus real upload wiring to the get-upload-url backend (built in Part
-// 2, never connected to a UI). This screen only does the TEXT half of
-// "whiteboard" for now. Also unenforced: nothing actually restricts a
+// (categoryAccess.ts, local-only), a REAL encrypted text note per safe
+// (crypto.ts's encryptData/decryptData via VaultSessionContext), AND real
+// file attachments — pick any file type, encrypted on-device, uploaded as
+// opaque ciphertext to the real backend (get-upload-url/get-download-url,
+// see categoryFiles.ts). Also unenforced: nothing actually restricts a
 // guardian from seeing a safe they're not authorized for — there's no
 // per-category encryption key yet, only one master key for the whole
 // room (see VaultHomeScreen.tsx's file header) — the authorization
 // choice here records the owner's intent for later.
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, TextInput } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
 import { ThemedBackground } from '../../components/ThemedBackground';
 import { RadioOption } from '../../components/RadioOption';
-import { ArrowLeftIcon } from '../../components/icons';
-import { appAlert } from '../../components/AppAlert';
+import { ArrowLeftIcon, DocumentIcon } from '../../components/icons';
+import { appAlert, appConfirm } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
 import { CATEGORIES, getCategory } from '../../data/categories';
 import { loadGuardianContacts, type GuardianSetupRecord } from '../../services/guardianContacts';
 import { loadCategoryAccess, saveCategoryAccess, type CategoryAccess } from '../../services/categoryAccess';
 import { loadCategoryNote, saveCategoryNote } from '../../services/categoryNotes';
+import {
+  pickAndUploadFile,
+  listFilesForCategory,
+  deleteFile,
+  downloadAndOpenFile,
+  formatFileSize,
+  PickCanceledError,
+  FileTooLargeError,
+  type BlobMeta,
+} from '../../services/categoryFiles';
 import { useVaultSession } from './VaultSessionContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'CategoryDetail'>;
@@ -56,6 +62,23 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [savingAccess, setSavingAccess] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
+  const [files, setFiles] = useState<BlobMeta[]>([]);
+  const [filesLoading, setFilesLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [busyBlobId, setBusyBlobId] = useState<string | null>(null);
+
+  const refreshFiles = useCallback(async () => {
+    setFilesLoading(true);
+    try {
+      const rows = await listFilesForCategory(accountId, categoryId);
+      setFiles(rows);
+    } catch {
+      // Offline / backend hiccup — leave whatever list was already shown
+      // rather than blank it out over a transient network error.
+    } finally {
+      setFilesLoading(false);
+    }
+  }, [accountId, categoryId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,10 +96,64 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
       }
       setLoading(false);
     })();
+    refreshFiles();
     return () => {
       cancelled = true;
     };
-  }, [accountId, categoryId, masterKeyHex]);
+  }, [accountId, categoryId, masterKeyHex, refreshFiles]);
+
+  const handleAttachFile = async () => {
+    if (!masterKeyHex) return;
+    setUploading(true);
+    try {
+      await pickAndUploadFile(accountId, categoryId, masterKeyHex);
+      await refreshFiles();
+    } catch (err) {
+      if (err instanceof PickCanceledError) {
+        // User closed the picker — not an error, nothing to say.
+      } else if (err instanceof FileTooLargeError) {
+        appAlert('ไฟล์ใหญ่เกินไป', err.message);
+      } else {
+        const reason = err instanceof Error ? err.message : String(err);
+        appAlert('แนบไฟล์ไม่สำเร็จ', `ลองใหม่อีกครั้ง\n\n${reason}`);
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleOpenFile = async (file: BlobMeta) => {
+    if (!masterKeyHex) return;
+    setBusyBlobId(file.blobId);
+    try {
+      await downloadAndOpenFile(accountId, file, masterKeyHex);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      appAlert('เปิดไฟล์ไม่สำเร็จ', `ลองใหม่อีกครั้ง\n\n${reason}`);
+    } finally {
+      setBusyBlobId(null);
+    }
+  };
+
+  const handleDeleteFile = (file: BlobMeta) => {
+    appConfirm(
+      'ลบไฟล์นี้',
+      `ลบ "${file.fileName}" ออกจากตู้เซฟนี้ถาวร — ยกเลิกไม่ได้`,
+      async () => {
+        setBusyBlobId(file.blobId);
+        try {
+          await deleteFile(accountId, file.blobId);
+          await refreshFiles();
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          appAlert('ลบไม่สำเร็จ', `ลองใหม่อีกครั้ง\n\n${reason}`);
+        } finally {
+          setBusyBlobId(null);
+        }
+      },
+      { confirmText: 'ลบ', cancelText: 'ยกเลิก', destructive: true }
+    );
+  };
 
   const handleSaveAccess = async () => {
     setSavingAccess(true);
@@ -151,14 +228,59 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
                   multiline
                   style={styles.whiteboard}
                 />
-                <Text style={styles.whiteboardHint}>
-                  ข้อความนี้เข้ารหัสด้วยกุญแจของห้องคุณเองก่อนบันทึก — แนบไฟล์ (Word/PDF/รูปภาพ/ฯลฯ) จะพร้อมใช้งานเร็วๆ นี้
-                </Text>
+                <Text style={styles.whiteboardHint}>ข้อความนี้เข้ารหัสด้วยกุญแจของห้องคุณเองก่อนบันทึก</Text>
                 <PrimaryButton
                   variant="secondary"
                   label={savingNote ? 'กำลังบันทึก…' : 'บันทึกข้อความ'}
                   onPress={handleSaveNote}
                   disabled={savingNote}
+                  style={styles.saveButton}
+                />
+
+                <Text style={[styles.sectionLabel, { marginTop: 0 }]}>ไฟล์แนบ</Text>
+                {filesLoading ? (
+                  <ActivityIndicator color={colors.textSecondary} style={{ marginBottom: spacing.md }} />
+                ) : (
+                  files.map((file) => {
+                    const busy = busyBlobId === file.blobId;
+                    return (
+                      <View key={file.blobId} style={styles.fileRow}>
+                        <DocumentIcon size={20} color={colors.textSecondary} />
+                        <Pressable
+                          style={styles.fileInfo}
+                          onPress={() => handleOpenFile(file)}
+                          disabled={busy}
+                          accessibilityRole="button"
+                        >
+                          <Text style={styles.fileName} numberOfLines={1}>
+                            {file.fileName}
+                          </Text>
+                          <Text style={styles.fileMeta}>{formatFileSize(file.fileSizeBytes)}</Text>
+                        </Pressable>
+                        {busy ? (
+                          <ActivityIndicator color={colors.textSecondary} />
+                        ) : (
+                          <Pressable
+                            onPress={() => handleDeleteFile(file)}
+                            accessibilityRole="button"
+                            hitSlop={8}
+                            style={styles.fileDeleteButton}
+                          >
+                            <Text style={styles.fileDeleteText}>ลบ</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    );
+                  })
+                )}
+                {!filesLoading && files.length === 0 && (
+                  <Text style={styles.whiteboardHint}>ยังไม่มีไฟล์แนบในตู้เซฟนี้</Text>
+                )}
+                <PrimaryButton
+                  variant="secondary"
+                  label={uploading ? 'กำลังอัปโหลด…' : '+ แนบไฟล์ (Word/PDF/รูปภาพ/ฯลฯ)'}
+                  onPress={handleAttachFile}
+                  disabled={uploading}
                   style={styles.saveButton}
                 />
               </>
@@ -252,4 +374,19 @@ const styles = StyleSheet.create({
   noteText: { ...typography.body, fontSize: 15, color: colors.textMuted, lineHeight: 20 },
   saveButton: { marginTop: spacing.sm, marginBottom: spacing.lg },
   closeButton: { marginTop: spacing.md },
+  fileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  fileInfo: { flex: 1 },
+  fileName: { ...typography.body, fontSize: 15, color: colors.textPrimary },
+  fileMeta: { ...typography.body, fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  fileDeleteButton: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  fileDeleteText: { ...typography.body, fontSize: 14, color: colors.dangerText },
 });
