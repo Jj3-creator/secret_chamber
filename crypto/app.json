@@ -8,6 +8,6 @@
     "scheme": "secretchamber",
     "ios": { "supportsTablet": true },
     "android": {},
-    "plugins": ["expo-crypto"]
+    "web": { "bundler": "metro" }
   }
 }

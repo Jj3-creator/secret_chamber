@@ -11,8 +11,39 @@ Kept in its own folder, independent of [`backend`](../backend) (Part 2).
 - [`src/services/crypto.ts`](src/services/crypto.ts) — core spec: passphrase, key derivation, account ID, AES-256-GCM encrypt/decrypt.
 - [`src/services/shamir.ts`](src/services/shamir.ts) — general-purpose k-of-n Shamir's Secret Sharing over GF(256).
 - [`src/services/vault.ts`](src/services/vault.ts) — built on the two above: **Decoy PIN** (real/decoy vault unlock) and **Dead Man's Switch recovery** (2-of-3 guardian shares), matching the "Onboarding / Register" and decision-point notes in the design.
+- [`src/screens/onboarding/`](src/screens/onboarding), [`src/navigation/`](src/navigation), [`src/components/`](src/components), [`src/theme/`](src/theme) — real, working Onboarding UI (see below).
+- [`src/polyfills.ts`](src/polyfills.ts) — must stay the first import in `App.tsx` (see "A real bug this caught" below).
 
-Tests: [`crypto.test.ts`](src/services/__tests__/crypto.test.ts), [`shamir.test.ts`](src/services/__tests__/shamir.test.ts), [`vault.test.ts`](src/services/__tests__/vault.test.ts) — 36 tests total.
+Tests: [`crypto.test.ts`](src/services/__tests__/crypto.test.ts), [`shamir.test.ts`](src/services/__tests__/shamir.test.ts), [`vault.test.ts`](src/services/__tests__/vault.test.ts) — 36 tests total. Plus an opt-in [`live-integration.test.ts`](src/services/__tests__/live-integration.test.ts) against the real deployed backend (see its header comment).
+
+## Onboarding screens (screens 1.1–1.4 of the design)
+
+Real, working React Native screens wired to the actual crypto functions above — not a mockup:
+
+```
+Welcome → Warning (3 acknowledgement checkboxes gate the button) →
+Passphrase (real generatePassphrase(), hide/reveal, 3 random confirm
+positions picked) → Confirm (3 word inputs w/ BIP-39 autocomplete,
+validates against the real passphrase, then calls deriveMasterKey +
+deriveAccountId and drops the passphrase from memory) → Done (placeholder
+— shows the real derived account_id; Vault Home isn't designed yet)
+```
+
+The in-progress passphrase lives only in [`OnboardingContext`](src/screens/onboarding/OnboardingContext.tsx) (React state), never in a navigation route param — route params can end up in devtools/persisted nav state, which the "zero memory traces" design explicitly wants to avoid. `clear()` drops it the moment Confirm succeeds.
+
+**Verified by actually running it**, not just `tsc`: `npx expo start --web` via this repo's `.claude/launch.json`, driven through the whole flow in a real browser (Welcome → Warning → Passphrase → Confirm → Done), checking the rendered account_id was a real, correctly-formatted 64-hex-char SHA-256 digest.
+
+### A real bug this caught
+
+Running the actual app surfaced something `npm test` couldn't: `bip39` uses Node's **global** `Buffer` internally, which neither a browser nor React Native provides by default. `generatePassphrase()` threw `ReferenceError: Buffer is not defined` the first time it ran for real — the Jest suite never caught this because Node (Jest's test environment) already has a real global `Buffer`, masking the gap. Fixed by [`src/polyfills.ts`](src/polyfills.ts), imported first in `App.tsx`. If you ever restructure the entry point, keep that import first.
+
+### Try it yourself
+
+```bash
+npx expo start --web
+```
+
+(Needs `@expo/metro-runtime`, `react-native-web`, `react-dom` — already in `package.json`. If `expo start --web` hangs on "Fetching bundled native modules from the server" in a network-restricted environment, run with `EXPO_OFFLINE=1`.)
 
 ## API
 
