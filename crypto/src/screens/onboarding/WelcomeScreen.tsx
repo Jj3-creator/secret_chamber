@@ -22,35 +22,39 @@ export function WelcomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Content grouped near the top, not vertically centered — a flex
+          spacer below absorbs the remaining space instead, so the button
+          block stays pinned near the bottom without a dead gap in the middle. */}
       <IconBadge size={60} style={styles.icon}>
         <VaultMarkIcon size={30} color={colors.textPrimary} />
       </IconBadge>
-      <View style={styles.textBlock}>
-        <Text style={styles.title}>ห้องแห่งความลับ</Text>
-        <Text style={styles.titleEn}>Secret Chamber</Text>
-        <Text style={styles.subtitle}>
-          แอปนี้เก็บไฟล์ลับของคุณ โดยเข้ารหัสไว้ในมือถือคุณเองเท่านั้น{'\n'}
-          ไม่มีใครเปิดดูได้ — แม้แต่คนสร้างแอปนี้ก็ตาม
-        </Text>
+      <Text style={styles.title}>ห้องแห่งความลับ</Text>
+      <Text style={styles.titleEn}>Secret Chamber</Text>
+      <Text style={styles.subtitle}>
+        แอปนี้เก็บไฟล์ลับของคุณ โดยเข้ารหัสไว้ในมือถือคุณเองเท่านั้น{'\n'}
+        ไม่มีใครเปิดดูได้ — แม้แต่คนสร้างแอปนี้ก็ตาม
+      </Text>
 
-        <Text style={styles.languageLabel}>ภาษาของกุญแจ 12 คำ (เลือกครั้งเดียวตอนสร้างห้อง)</Text>
-        <View style={styles.languageRow}>
-          {LANGUAGE_OPTIONS.map((opt) => {
-            const active = passphraseLanguage === opt.value;
-            return (
-              <Pressable
-                key={opt.value}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                onPress={() => setPassphraseLanguage(opt.value)}
-                style={[styles.languageChip, active && styles.languageChipActive]}
-              >
-                <Text style={[styles.languageChipText, active && styles.languageChipTextActive]}>{opt.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      <Text style={styles.languageLabel}>ภาษาของกุญแจ 12 คำ (เลือกครั้งเดียวตอนสร้างห้อง)</Text>
+      <View style={styles.languageRow}>
+        {LANGUAGE_OPTIONS.map((opt) => {
+          const active = passphraseLanguage === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              onPress={() => setPassphraseLanguage(opt.value)}
+              style={[styles.languageChip, active && styles.languageChipActive]}
+            >
+              <Text style={[styles.languageChipText, active && styles.languageChipTextActive]}>{opt.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
+
+      <View style={styles.spacer} />
+
       <View>
         <PrimaryButton label="สร้างห้องใหม่" onPress={() => navigation.navigate('Warning')} />
         <Pressable
@@ -71,11 +75,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
-    justifyContent: 'space-between',
   },
-  icon: { marginTop: spacing.xxl },
-  textBlock: { flex: 1, justifyContent: 'center' },
+  icon: { marginBottom: spacing.lg },
+  spacer: { flex: 1, minHeight: spacing.lg },
   title: { ...typography.title, color: colors.textPrimary, marginBottom: 2 },
   titleEn: { ...typography.body, fontSize: 14, color: colors.textMuted, marginBottom: spacing.md },
   subtitle: { ...typography.subtitle, color: colors.textSecondary, marginBottom: spacing.xl },
