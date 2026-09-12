@@ -8,11 +8,23 @@
 // counts/sizes below just mirror the design's example numbers. Tapping one
 // shows a placeholder alert rather than a real file list (section 04,
 // "Upload / View item", isn't built yet).
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, type ComponentType } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { IconBadge } from '../../components/IconBadge';
+import {
+  type IconProps,
+  ImageStackIcon,
+  DocumentIcon,
+  HeartPulseIcon,
+  FeatherIcon,
+  LockIcon,
+  LayersIcon,
+  GearIcon,
+  ChevronRightIcon,
+} from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, sendHeartbeat, type AccountStatus } from '../../services/backend';
 
@@ -24,16 +36,17 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 interface CategoryRow {
   name: string;
   caption: string;
+  icon: ComponentType<IconProps>;
 }
 
 // Mock — see file header. Matches the design's example data exactly.
 const CATEGORIES: CategoryRow[] = [
-  { name: 'Personal Memory Vault', caption: '18 ไฟล์ · 14.8 MB' },
-  { name: 'Critical Documents', caption: '9 ไฟล์ · 11.2 MB' },
-  { name: 'Health & Sensitive Personal', caption: '6 ไฟล์ · 4.1 MB' },
-  { name: 'Ethical Will / Legacy', caption: '3 ไฟล์ · 1.9 MB · ผูกกับ DMS' },
-  { name: 'High-Sensitivity Content', caption: 'ล็อกซ้อน · ต้องใส่ PIN อีกครั้ง' },
-  { name: 'Decoy Chamber', caption: '12 ไฟล์ · จัดฉากไว้ให้ดู' },
+  { name: 'Personal Memory Vault', caption: '18 ไฟล์ · 14.8 MB', icon: ImageStackIcon },
+  { name: 'Critical Documents', caption: '9 ไฟล์ · 11.2 MB', icon: DocumentIcon },
+  { name: 'Health & Sensitive Personal', caption: '6 ไฟล์ · 4.1 MB', icon: HeartPulseIcon },
+  { name: 'Ethical Will / Legacy', caption: '3 ไฟล์ · 1.9 MB · ผูกกับ DMS', icon: FeatherIcon },
+  { name: 'High-Sensitivity Content', caption: 'ล็อกซ้อน · ต้องใส่ PIN อีกครั้ง', icon: LockIcon },
+  { name: 'Decoy Chamber', caption: '12 ไฟล์ · จัดฉากไว้ให้ดู', icon: LayersIcon },
 ];
 
 function formatMB(bytes: number): string {
@@ -99,7 +112,14 @@ export function VaultHomeScreen({ route }: Props) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>ห้องของฉัน</Text>
-        <View style={styles.iconPlaceholder} />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => Alert.alert('ตั้งค่า', 'หน้าตั้งค่า (section 05) ยังไม่ได้สร้าง')}
+        >
+          <IconBadge size={40}>
+            <GearIcon size={20} color={colors.textPrimary} />
+          </IconBadge>
+        </Pressable>
       </View>
 
       {loading ? (
@@ -133,23 +153,28 @@ export function VaultHomeScreen({ route }: Props) {
           </View>
 
           <View style={styles.categoryList}>
-            {CATEGORIES.map((cat) => (
-              <Pressable
-                key={cat.name}
-                style={styles.categoryRow}
-                accessibilityRole="button"
-                onPress={() =>
-                  Alert.alert(cat.name, 'หน้ารายการไฟล์ในหมวดนี้ยังไม่ได้สร้าง (section 04 — placeholder)')
-                }
-              >
-                <View style={styles.categoryIcon} />
-                <View style={styles.categoryTextBlock}>
-                  <Text style={styles.categoryName}>{cat.name}</Text>
-                  <Text style={styles.categoryCaption}>{cat.caption}</Text>
-                </View>
-                <Text style={styles.chevron}>{'›'}</Text>
-              </Pressable>
-            ))}
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <Pressable
+                  key={cat.name}
+                  style={styles.categoryRow}
+                  accessibilityRole="button"
+                  onPress={() =>
+                    Alert.alert(cat.name, 'หน้ารายการไฟล์ในหมวดนี้ยังไม่ได้สร้าง (section 04 — placeholder)')
+                  }
+                >
+                  <IconBadge size={42}>
+                    <Icon size={21} color={colors.textPrimary} />
+                  </IconBadge>
+                  <View style={styles.categoryTextBlock}>
+                    <Text style={styles.categoryName}>{cat.name}</Text>
+                    <Text style={styles.categoryCaption}>{cat.caption}</Text>
+                  </View>
+                  <ChevronRightIcon size={18} color={colors.textMuted} />
+                </Pressable>
+              );
+            })}
           </View>
         </ScrollView>
       )}
@@ -167,7 +192,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   title: { ...typography.title, fontSize: 24, color: colors.textPrimary },
-  iconPlaceholder: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
   loader: { marginTop: spacing.xxl },
   error: { color: colors.dangerText, marginBottom: spacing.md },
   card: {
@@ -201,16 +225,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: spacing.md,
   },
-  categoryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
   categoryTextBlock: { flex: 1 },
   categoryName: { ...typography.body, fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   categoryCaption: { ...typography.body, fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  chevron: { fontSize: 20, color: colors.textMuted },
 });

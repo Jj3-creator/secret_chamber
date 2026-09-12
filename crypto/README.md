@@ -13,6 +13,7 @@ Kept in its own folder, independent of [`backend`](../backend) (Part 2).
 - [`src/services/vault.ts`](src/services/vault.ts) — built on the two above: **Decoy PIN** (real/decoy vault unlock) and **Dead Man's Switch recovery** (2-of-3 guardian shares), matching the "Onboarding / Register" and decision-point notes in the design.
 - [`src/screens/onboarding/`](src/screens/onboarding), [`src/navigation/`](src/navigation), [`src/components/`](src/components), [`src/theme/`](src/theme) — real, working Onboarding UI (see below).
 - [`src/screens/vault/VaultHomeScreen.tsx`](src/screens/vault/VaultHomeScreen.tsx) — screen 3.1, Vault Dashboard home (see below).
+- [`src/components/icons/`](src/components/icons), [`src/components/IconBadge.tsx`](src/components/IconBadge.tsx) — hand-drawn line icons (`react-native-svg`) in a soft gradient badge (`expo-linear-gradient`). Added after feedback that the empty bordered-square placeholders read as too stark/empty ("looks like a funeral") — real icons + a subtle glow give depth without breaking the design's deliberately plain, camouflaged tone.
 - [`src/services/backend.ts`](src/services/backend.ts) — thin `fetch` client for the deployed backend (Part 2): reads an account's own row via PostgREST + RLS, and calls `dms-heartbeat`.
 - [`src/polyfills.ts`](src/polyfills.ts) — must stay the first import in `App.tsx` (see "A real bug this caught" below).
 

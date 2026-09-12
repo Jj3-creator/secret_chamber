@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../theme/tokens';
+import { ArrowLeftIcon } from './icons';
 
 interface Props {
   step: number;
@@ -15,11 +16,11 @@ export function ScreenHeader({ step, totalSteps, onBack }: Props) {
         onPress={onBack}
         hitSlop={12}
         disabled={!onBack}
-        style={styles.backButton}
+        style={[styles.backButton, !onBack && styles.hidden]}
         accessibilityRole="button"
         accessibilityLabel="ย้อนกลับ"
       >
-        <Text style={[styles.backArrow, !onBack && styles.hidden]}>←</Text>
+        <ArrowLeftIcon size={20} color={colors.textPrimary} />
       </Pressable>
       <Text style={styles.progress}>
         {step} / {totalSteps}
@@ -37,7 +38,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   backButton: { width: 32, height: 32, alignItems: 'flex-start', justifyContent: 'center' },
-  backArrow: { fontSize: 20, color: colors.textPrimary },
   hidden: { opacity: 0 },
   progress: { ...typography.label, color: colors.textMuted },
 });
