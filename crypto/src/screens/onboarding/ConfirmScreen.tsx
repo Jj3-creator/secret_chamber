@@ -50,9 +50,9 @@ export function ConfirmScreen({ navigation }: Props) {
     try {
       const { masterKeyHex, kdf } = await deriveMasterKey(passphrase);
       const accountId = deriveAccountId(masterKeyHex);
-      setMasterKeyHex(masterKeyHex); // DMS Setup may still need it — cleared there (or in Personalize if skipped)
+      setMasterKeyHex(masterKeyHex); // SetPin/DMS Setup may still need it — cleared once DMS Setup finishes/skips
       clearPassphrase(); // done with the passphrase itself either way
-      navigation.navigate('Personalize', { accountId, kdf });
+      navigation.navigate('SetPin', { accountId, kdf });
     } finally {
       setBusy(false);
     }
