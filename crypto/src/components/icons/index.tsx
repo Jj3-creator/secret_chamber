@@ -241,3 +241,51 @@ export function LockClosedIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** Financial status — a filled coin with a currency mark. */
+export function MoneyIcon(props: IconProps) {
+  const { size, color, strokeWidth } = base(props);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={8} fill={withAlpha(color, 0.2)} stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M9.5 9.2c0-1.2 1.1-2 2.5-2s2.5.8 2.5 2c0 1.1-.9 1.6-2.5 2s-2.5.9-2.5 2c0 1.2 1.1 2 2.5 2s2.5-.8 2.5-2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <Path d="M12 5.8v1M12 17.2v1" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/** Assets — a filled house/box silhouette. */
+export function AssetIcon(props: IconProps) {
+  const { size, color, strokeWidth } = base(props);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 11 12 4l8 7" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9" fill={withAlpha(color, 0.2)} stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
+      <Rect x={10} y={14} width={4} height={6} fill={color} />
+    </Svg>
+  );
+}
+
+/** Goals / future plans — a filled target with an arrow. */
+export function TargetIcon(props: IconProps) {
+  const { size, color, strokeWidth } = base(props);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={11} cy={13} r={7.5} fill={withAlpha(color, 0.16)} stroke={color} strokeWidth={strokeWidth} />
+      <Circle cx={11} cy={13} r={3.2} fill={color} />
+      <Path d="M15.5 8.5 20 4M20 4h-3.2M20 4v3.2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** End-of-life wishes (living will) — a filled candle, calm rather than somber. */
+export function CandleIcon(props: IconProps) {
+  const { size, color, strokeWidth } = base(props);
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 3c1.4 1.7 2 2.8 2 3.8a2 2 0 1 1-4 0c0-1 .6-2.1 2-3.8Z" fill={withAlpha(color, 0.3)} stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" />
+      <Rect x={9} y={10} width={6} height={10} rx={1.2} fill={withAlpha(color, 0.2)} stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M9 13.5h6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}

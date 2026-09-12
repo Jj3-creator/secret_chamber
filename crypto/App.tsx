@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
 import { RoomThemeProvider } from './src/theme/RoomThemeContext';
+import { VaultSessionProvider } from './src/screens/vault/VaultSessionContext';
 import { loadDeviceLock } from './src/services/deviceLock';
 import { colors } from './src/theme/tokens';
 import { AppAlertHost } from './src/components/AppAlert';
@@ -39,14 +40,16 @@ export default function App() {
 
   return (
     <RoomThemeProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <OnboardingNavigator initialRouteName={initialRoute} />
-      </NavigationContainer>
-      {/* Mounted once, at the root — every appAlert() call anywhere in the
-          app talks to this single host. See AppAlert.tsx for why this
-          exists (RN's own Alert.alert renders nothing on web). */}
-      <AppAlertHost />
+      <VaultSessionProvider>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          <OnboardingNavigator initialRouteName={initialRoute} />
+        </NavigationContainer>
+        {/* Mounted once, at the root — every appAlert() call anywhere in
+            the app talks to this single host. See AppAlert.tsx for why
+            this exists (RN's own Alert.alert renders nothing on web). */}
+        <AppAlertHost />
+      </VaultSessionProvider>
     </RoomThemeProvider>
   );
 }

@@ -16,6 +16,7 @@ import { loadDeviceLock, type DeviceLock } from '../../services/deviceLock';
 import { loadRoomProfile } from '../../services/localProfile';
 import { getAvatarComponent } from '../../components/avatars';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
+import { useVaultSession } from '../vault/VaultSessionContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Unlock'>;
 
@@ -27,6 +28,7 @@ export function UnlockScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const { accentColor, backgroundColor, setThemeId } = useRoomTheme();
+  const { setMasterKeyHex } = useVaultSession();
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +68,10 @@ export function UnlockScreen({ navigation }: Props) {
         setError('PIN ไม่ถูกต้อง ลองใหม่อีกครั้ง');
         return;
       }
+      // Kept in memory only for this unlocked session (VaultSessionContext)
+      // — lets each safe actually encrypt/decrypt its own content without
+      // re-deriving anything. Cleared again the moment the room is locked.
+      setMasterKeyHex(masterKeyHex);
       navigation.reset({ index: 0, routes: [{ name: 'VaultHome', params: { accountId: lock.accountId } }] });
     } catch {
       setError('PIN ไม่ถูกต้อง ลองใหม่อีกครั้ง');

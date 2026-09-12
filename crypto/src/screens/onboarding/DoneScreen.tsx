@@ -1,6 +1,6 @@
 // Landing screen right after onboarding completes — reached after the
 // optional SetPin and DMSSetup steps.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
@@ -8,13 +8,29 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { ThemedBackground } from '../../components/ThemedBackground';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
+import { loadDeviceLock } from '../../services/deviceLock';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Done'>;
 
 export function DoneScreen({ route, navigation }: Props) {
   const { accountId, kdf } = route.params;
   const [showTechDetails, setShowTechDetails] = useState(false);
+  // Feedback: since the reassurance text now says "the system re-derives
+  // 3 words as the key every time" it needs to also explain what the PIN
+  // is for, right below it — but SetPinScreen has a skip option, so only
+  // show the PIN line when a PIN was actually set for this room.
+  const [hasPin, setHasPin] = useState(false);
   const { accentColor, backgroundColor } = useRoomTheme();
+
+  useEffect(() => {
+    let cancelled = false;
+    loadDeviceLock().then((lock) => {
+      if (!cancelled && lock && lock.accountId === accountId) setHasPin(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId]);
 
   return (
     <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
@@ -32,7 +48,8 @@ export function DoneScreen({ route, navigation }: Props) {
       <View style={styles.textBlock}>
         <Text style={styles.title}>สร้างห้องลับของคุณสำเร็จแล้ว</Text>
         <Text style={styles.reassurance}>
-          จำ 12 คำที่จดไว้ให้ดี — แค่นั้นพอ ไม่ต้องจดอะไรเพิ่มอีกแล้ว ระบบคำนวณทุกอย่างใหม่ได้เสมอจาก 12 คำนี้
+          เก็บรหัสกุญแจ 12 คำไว้ให้ดี ระบบจะสุ่ม 3 คำเป็นกุญแจในการเข้าห้องทุกครั้ง
+          {hasPin && ' และจำ PIN เพื่อปลดล็อกในขณะที่เข้าๆ ออกๆ ห้องช่วงสั้นๆ'}
         </Text>
 
         <Pressable onPress={() => setShowTechDetails((v) => !v)} accessibilityRole="button">

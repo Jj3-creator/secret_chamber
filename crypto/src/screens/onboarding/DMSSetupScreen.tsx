@@ -26,6 +26,7 @@ import type { OnboardingStackParamList } from '../../navigation/OnboardingNaviga
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ThemedBackground } from '../../components/ThemedBackground';
 import { IconBadge } from '../../components/IconBadge';
+import { Checkbox } from '../../components/Checkbox';
 import { KeyIcon } from '../../components/icons';
 import { appAlert } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
@@ -35,6 +36,7 @@ import { setupDms } from '../../services/backend';
 import { saveGuardianContacts } from '../../services/guardianContacts';
 import { useOnboarding } from './OnboardingContext';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
+import { useVaultSession } from '../vault/VaultSessionContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'DMSSetup'>;
 
@@ -56,11 +58,11 @@ const MAX_GUARDIANS = 3;
 
 interface Guardian {
   name: string;
-  phone: string;
+  email: string;
   lineId: string;
 }
 
-const emptyGuardian = (): Guardian => ({ name: '', phone: '', lineId: '' });
+const emptyGuardian = (): Guardian => ({ name: '', email: '', lineId: '' });
 
 interface RevealedGuardian {
   nickname: string;
@@ -71,6 +73,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   const { accountId, kdf } = route.params;
   const { masterKeyHex, clear } = useOnboarding();
   const { accentColor, backgroundColor } = useRoomTheme();
+  const { setMasterKeyHex: setSessionMasterKeyHex } = useVaultSession();
 
   const [enabled, setEnabled] = useState(false);
   const [periodHours, setPeriodHours] = useState(PERIOD_OPTIONS[1].hours); // 14 days default
@@ -79,12 +82,13 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   // yet. Kept as a separate, honestly-labeled toggle rather than silently
   // ignored, so the choice is at least recorded for when that's built.
   const [notifyEnabled, setNotifyEnabled] = useState(true);
-  const [guardians, setGuardians] = useState<Guardian[]>([emptyGuardian(), emptyGuardian()]);
-  // How many guardians must agree to recover — the owner's own choice,
-  // clamped to [2, guardians.length] whenever the guardian count changes.
-  // threshold === guardians.length means "everyone must agree" (AND);
-  // threshold < guardians.length means "any N of them" (OR-like).
-  const [threshold, setThreshold] = useState(2);
+  const [guardians, setGuardians] = useState<Guardian[]>([emptyGuardian()]);
+  // Feedback: simplified from a "pick a number from 2..N" slider to a
+  // plain binary choice — 'any' means one guardian's confirmation alone
+  // is enough (OR); 'all' means every single guardian must confirm
+  // together (AND). Only shown/meaningful once there are 2+ guardians.
+  const [verifyMode, setVerifyMode] = useState<'any' | 'all'>('all');
+  const [notifyConsent, setNotifyConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [revealed, setRevealed] = useState<RevealedGuardian[] | null>(null);
 
@@ -92,19 +96,17 @@ export function DMSSetupScreen({ navigation, route }: Props) {
     if (guardians.length < MAX_GUARDIANS) setGuardians((prev) => [...prev, emptyGuardian()]);
   };
   const removeGuardian = (i: number) => {
-    if (guardians.length > MIN_GUARDIANS) {
-      setGuardians((prev) => {
-        const next = prev.filter((_, idx) => idx !== i);
-        setThreshold((t) => Math.min(t, Math.max(2, next.length)));
-        return next;
-      });
-    }
+    if (guardians.length > MIN_GUARDIANS) setGuardians((prev) => prev.filter((_, idx) => idx !== i));
   };
   const updateGuardian = (i: number, field: keyof Guardian, value: string) =>
     setGuardians((prev) => prev.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
 
   const finish = () => {
-    clear(); // done with masterKeyHex either way
+    // Carry the real key into VaultSessionContext before OnboardingContext
+    // drops it — so this brand-new room's very first VaultHome visit can
+    // already encrypt/decrypt safe content, the same as a PIN-unlocked one.
+    if (masterKeyHex) setSessionMasterKeyHex(masterKeyHex);
+    clear(); // done with OnboardingContext's own copy either way
     navigation.navigate('Done', { accountId, kdf });
   };
 
@@ -120,22 +122,39 @@ export function DMSSetupScreen({ navigation, route }: Props) {
       appAlert('กรอกไม่ครบ', `ใส่ชื่อผู้ถือกุญแจสำรองอย่างน้อย ${MIN_GUARDIANS} คน`);
       return;
     }
-    const effectiveThreshold = names.length === 1 ? 1 : Math.min(Math.max(threshold, 2), names.length);
+    if (!notifyConsent) {
+      appAlert(
+        'ยังไม่ได้ยืนยัน',
+        'กรุณายืนยันว่าคุณจะเป็นผู้แจ้งรหัสกุญแจสำรองให้ผู้รับด้วยตัวเอง ก่อนตั้งค่าต่อ'
+      );
+      return;
+    }
+    // any = 1-of-N (one guardian alone is enough); all = N-of-N (everyone
+    // must agree). A single guardian makes the choice moot either way.
+    const effectiveThreshold = names.length === 1 ? 1 : verifyMode === 'all' ? names.length : 1;
 
     setSubmitting(true);
     try {
       const tokens = await Promise.all(names.map(() => generateRandomToken()));
       const guardianKeys = await Promise.all(tokens.map((t) => deriveMasterKey(t)));
 
-      // With exactly 1 guardian there's nothing to "split" — Shamir's
+      // threshold === 1 (either only 1 guardian exists, or "any one
+      // guardian" was chosen) means there's nothing to "split" — Shamir's
       // library correctly refuses a threshold below 2 (a 1-of-1 share IS
       // the secret, not a share of it). Wrap the real master key straight
-      // to that one person instead; anything >= 2 guardians goes through
-      // real threshold-of-N secret splitting (threshold chosen by the
-      // owner above) as before.
+      // to EACH guardian independently instead — any one of them can
+      // unwrap it alone. threshold >= 2 ("all must agree") goes through
+      // real N-of-N secret splitting so no subset smaller than all of
+      // them can reconstruct it.
       const rows =
-        names.length === 1
-          ? [{ shareIndex: 1, tokenHash: sha256Hex(tokens[0]), wrapped: await wrapVaultKey(masterKeyHex, guardianKeys[0].masterKeyHex) }]
+        effectiveThreshold === 1
+          ? await Promise.all(
+              names.map(async (_, i) => ({
+                shareIndex: i + 1,
+                tokenHash: sha256Hex(tokens[i]),
+                wrapped: await wrapVaultKey(masterKeyHex, guardianKeys[i].masterKeyHex),
+              }))
+            )
           : await (async () => {
               const { shares } = await createRecoveryShares(masterKeyHex, {
                 guardians: names.length,
@@ -160,7 +179,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
       await saveGuardianContacts(accountId, {
         guardians: guardians.map((g) => ({
           name: g.name.trim(),
-          phone: g.phone.trim() || undefined,
+          email: g.email.trim() || undefined,
           lineId: g.lineId.trim() || undefined,
         })),
         threshold: effectiveThreshold,
@@ -180,7 +199,10 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
   const handleCopyToken = async (token: string) => {
     await Clipboard.setStringAsync(token);
-    appAlert('คัดลอกแล้ว', 'ส่งรหัสนี้ให้ผู้รับด้วยตัวเอง (นอกแอป) แล้วลบออกจากคลิปบอร์ดของคุณ');
+    appAlert(
+      'คัดลอกแล้ว',
+      'กรุณาจัดเก็บและจัดส่งรหัสกุญแจสำรองนี้ ให้ผู้ที่ท่านระบุชื่อ (ในหน้าที่แล้ว) เอง'
+    );
   };
 
   if (revealed) {
@@ -226,9 +248,9 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           กุญแจนี้จะถูกส่งให้คนที่คุณระบุตัวตนไว้ (ทายาท/คนที่คุณไว้ใจ) ก็ต่อเมื่อห้องของคุณขาดการเช็คอินเกินเวลาที่คุณกำหนด
           {guardians.length <= 1
             ? ' (มีผู้ถือกุญแจแค่คนเดียว คนนั้นจึงกู้คืนได้ทันทีด้วยรหัสของตัวเอง — ไม่มีใครช่วยตรวจสอบถ่วงดุล แนะนำให้เพิ่มเป็น 2-3 คนเพื่อความปลอดภัย)'
-            : threshold >= guardians.length
+            : verifyMode === 'all'
               ? ` (ต้องได้รับความยินยอมจากทุกคนทั้ง ${guardians.length} คน — ปลอดภัยที่สุด แต่ถ้าติดต่อใครคนหนึ่งไม่ได้ก็กู้คืนไม่ได้)`
-              : ` (ต้องมีอย่างน้อย ${threshold} จาก ${guardians.length} คนยินยอมร่วมกันถึงจะกู้คืนได้ — กันไม่ให้คนใดคนหนึ่งแอบกู้คืนคนเดียว แต่ยังกู้คืนได้แม้บางคนติดต่อไม่ได้)`}
+              : ` (แค่คนใดคนหนึ่งใน ${guardians.length} คนก็กู้คืนได้ — สะดวกกว่า แต่ทายาทคนใดคนหนึ่งก็สามารถกู้คืนคนเดียวได้เช่นกัน)`}
         </Text>
 
         <View style={styles.toggleRow}>
@@ -265,7 +287,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
               <Switch value={notifyEnabled} onValueChange={setNotifyEnabled} />
             </View>
             <Text style={styles.notifyCaveat}>
-              (ตอนนี้แอปยังส่งแจ้งเตือนอัตโนมัติไม่ได้จริง — ค่านี้แค่บันทึกความต้องการของคุณไว้ก่อน จนกว่าจะเชื่อมระบบส่ง SMS/LINE จริง)
+              (ฟีเจอร์นี้ยังไม่เปิดใช้งาน — อาจเปิดให้ใช้งานได้ในโอกาสถัดไป)
             </Text>
 
             <View style={styles.warnBox}>
@@ -294,11 +316,12 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                 </View>
                 <View style={styles.guardianRow}>
                   <TextInput
-                    value={guardian.phone}
-                    onChangeText={(v) => updateGuardian(i, 'phone', v)}
-                    placeholder="เบอร์โทร (ไม่บังคับ)"
+                    value={guardian.email}
+                    onChangeText={(v) => updateGuardian(i, 'email', v)}
+                    placeholder="อีเมล (ไม่บังคับ)"
                     placeholderTextColor={colors.textMuted}
-                    keyboardType="phone-pad"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                     style={[styles.input, styles.inputHalf]}
                   />
                   <TextInput
@@ -312,7 +335,8 @@ export function DMSSetupScreen({ navigation, route }: Props) {
               </View>
             ))}
             <Text style={styles.contactNote}>
-              เก็บเบอร์โทร/LINE ไว้ในเครื่องนี้เท่านั้น (ไม่ส่งขึ้น server) — เผื่อคุณต้องใช้ติดต่อทายาทเองในอนาคต
+              เก็บอีเมล/LINE ไว้ในเครื่องนี้เท่านั้น (ไม่ส่งขึ้น server) — ใช้อีเมลหรือ LINE แทนเบอร์โทร เพราะเชื่อมต่อแจ้งเตือนได้โดยไม่มีค่าใช้จ่าย
+              เมื่อฟีเจอร์นี้เปิดใช้งานในอนาคต
             </Text>
             {guardians.length < MAX_GUARDIANS && (
               <Pressable onPress={addGuardian} accessibilityRole="button" style={styles.addLink}>
@@ -322,40 +346,49 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
             {guardians.length >= 2 && (
               <>
-                <Text style={styles.fieldLabel}>ต้องมีกี่คนยืนยันร่วมกันถึงจะกู้คืนได้?</Text>
+                <Text style={styles.fieldLabel}>วิธียืนยันร่วมกัน</Text>
                 <View style={styles.periodRow}>
-                  {Array.from({ length: guardians.length - 1 }, (_, i) => i + 2).map((n) => {
-                    const active = threshold === n;
-                    return (
-                      <Pressable
-                        key={n}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        onPress={() => setThreshold(n)}
-                        style={[styles.periodChip, active && { borderColor: accentColor, backgroundColor: `${accentColor}1F` }]}
-                      >
-                        <Text style={[styles.periodChipText, active && styles.periodChipTextActive]}>
-                          {n} จาก {guardians.length} คน{n === guardians.length ? ' (ทุกคน)' : ''}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: verifyMode === 'any' }}
+                    onPress={() => setVerifyMode('any')}
+                    style={[styles.periodChip, verifyMode === 'any' && { borderColor: accentColor, backgroundColor: `${accentColor}1F` }]}
+                  >
+                    <Text style={[styles.periodChipText, verifyMode === 'any' && styles.periodChipTextActive]}>
+                      คนใดคนหนึ่ง (OR)
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: verifyMode === 'all' }}
+                    onPress={() => setVerifyMode('all')}
+                    style={[styles.periodChip, verifyMode === 'all' && { borderColor: accentColor, backgroundColor: `${accentColor}1F` }]}
+                  >
+                    <Text style={[styles.periodChipText, verifyMode === 'all' && styles.periodChipTextActive]}>
+                      ทุกคนร่วมกัน (AND)
+                    </Text>
+                  </Pressable>
                 </View>
                 <Text style={styles.periodExplainer}>
-                  {threshold >= guardians.length
-                    ? `เลือก "ต้องยืนยันครบทุกคน" (AND) — ปลอดภัยสูงสุด แต่ถ้ามีใครติดต่อไม่ได้แม้แต่คนเดียว จะกู้คืนไม่ได้เลย`
-                    : `เลือก "แค่บางคนก็พอ" (OR แบบมีเงื่อนไข) — สะดวกกว่า เผื่อติดต่อบางคนไม่ได้ ก็ยังกู้คืนได้ถ้าอีกฝ่ายยืนยันครบ ${threshold} คน`}
+                  {verifyMode === 'all'
+                    ? `เลือก "ทุกคนร่วมกัน" (AND) — หมายความว่าคุณตั้งผู้รับกุญแจสำรองไว้ ${guardians.length} คน ต้องใช้รหัสยืนยันครบทั้ง ${guardians.length} คนจึงจะเปิดห้องได้ ปลอดภัยสูงสุด แต่ถ้ามีใครติดต่อไม่ได้แม้แต่คนเดียว จะกู้คืนไม่ได้เลย`
+                    : `เลือก "คนใดคนหนึ่ง" (OR) — แค่คนใดคนหนึ่งในผู้รับกุญแจสำรองที่ตั้งไว้ยืนยันก็เปิดห้องได้ทันที สะดวกกว่า แต่ทายาทคนใดคนหนึ่งก็สามารถกู้คืนคนเดียวได้เช่นกัน โดยไม่ต้องรอคนอื่น`}
                 </Text>
               </>
             )}
 
             <View style={styles.noteBox}>
               <Text style={styles.noteText}>
-                แอปนี้ไม่ส่ง SMS หรือ LINE แจ้งผู้ถือกุญแจสำรองให้อัตโนมัติ — คุณต้องคัดลอกรหัสที่จะแสดงในขั้นถัดไปแล้วหาวิธี
-                แจ้งรหัสนี้ให้แต่ละคนด้วยตัวเอง (นอกแอป) ตามวิธีที่คุณสะดวก — จะแจ้งตอนนี้เลย หรือรอไว้แจ้งทีหลังก็ได้
-                ขอแค่คุณเป็นคนตัดสินใจเองว่าจะแจ้งเมื่อไหร่และแจ้งยังไง
+                ฟีเจอร์แจ้งเตือนอัตโนมัติยังไม่เปิดใช้งาน — คุณต้องคัดลอกรหัสที่จะแสดงในขั้นถัดไปแล้วหาวิธีแจ้งรหัสนี้ให้แต่ละคนด้วยตัวเอง
+                (นอกแอป) ตามวิธีที่คุณสะดวก — จะแจ้งตอนนี้เลย หรือรอไว้แจ้งทีหลังก็ได้ ขอแค่คุณเป็นคนตัดสินใจเองว่าจะแจ้งเมื่อไหร่และแจ้งยังไง
               </Text>
             </View>
+
+            <Checkbox
+              checked={notifyConsent}
+              onToggle={() => setNotifyConsent((v) => !v)}
+              label="ฉันเข้าใจและยืนยันว่าจะเป็นผู้แจ้งรหัสกุญแจสำรองนี้ให้ผู้รับด้วยตัวเอง — ผู้สร้างแอปไม่มีส่วนรับผิดชอบต่อความลับหรือข้อมูลใดๆ ของฉัน"
+            />
           </>
         )}
       </ScrollView>

@@ -14,6 +14,7 @@ import { DoneScreen } from '../screens/onboarding/DoneScreen';
 import { VaultHomeScreen } from '../screens/vault/VaultHomeScreen';
 import { DashboardScreen } from '../screens/vault/DashboardScreen';
 import { CategoryDetailScreen } from '../screens/vault/CategoryDetailScreen';
+import { ExitScreen } from '../screens/vault/ExitScreen';
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
@@ -44,6 +45,8 @@ export type OnboardingStackParamList = {
   Dashboard: { accountId: string };
   /** One safe's own page — name/description, and which guardians can access it. See CategoryDetailScreen.tsx. */
   CategoryDetail: { accountId: string; categoryId: string };
+  /** Exit / close-room confirmation page — reached from VaultHome's lock icon. See ExitScreen.tsx. */
+  Exit: undefined;
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
@@ -72,6 +75,7 @@ export function OnboardingNavigator({ initialRouteName }: Props) {
         <Stack.Screen name="VaultHome" component={VaultHomeScreen} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
+        <Stack.Screen name="Exit" component={ExitScreen} />
       </Stack.Navigator>
     </OnboardingProvider>
   );

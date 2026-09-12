@@ -14,16 +14,21 @@
  * guardians can access a given safe) know who exists without re-deriving
  * anything from the passphrase.
  *
- * Deliberately local-only, like localProfile.ts — phone numbers/LINE IDs
- * are exactly the kind of PII this app's zero-knowledge design never
- * sends to the server. The dms-setup Edge Function never sees this data
- * — it only ever receives the wrapped share + token hash, unchanged.
+ * Deliberately local-only, like localProfile.ts — emails/LINE IDs are
+ * exactly the kind of PII this app's zero-knowledge design never sends
+ * to the server. The dms-setup Edge Function never sees this data — it
+ * only ever receives the wrapped share + token hash, unchanged.
+ *
+ * Feedback: phone numbers were dropped in favor of email/LINE — a real
+ * phone-network connection (SMS/calls) usually costs money and needs a
+ * paid provider, while email and LINE both have free-tier APIs, so
+ * they're the more realistic path to an eventual real notify feature.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface GuardianContact {
   name: string;
-  phone?: string;
+  email?: string;
   lineId?: string;
 }
 

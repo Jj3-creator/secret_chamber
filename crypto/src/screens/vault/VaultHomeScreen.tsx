@@ -8,19 +8,22 @@
 // example numbers. Tapping one shows a placeholder alert rather than a
 // real file list (section 04, "Upload / View item", isn't built yet).
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
 import { ThemedBackground } from '../../components/ThemedBackground';
-import { appAlert, appConfirm } from '../../components/AppAlert';
+import { SafeGraphic } from '../../components/SafeGraphic';
+import { appAlert } from '../../components/AppAlert';
 import { GearIcon, ChartIcon, PlusIcon, CheckCircleIcon, LockClosedIcon } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, sendHeartbeat, type AccountStatus } from '../../services/backend';
 import { loadRoomProfile, type RoomProfile } from '../../services/localProfile';
 import { recordCheckin, loadCheckinLog, type CheckinLog } from '../../services/checkinLog';
-import { loadDeviceLock } from '../../services/deviceLock';
+import { loadGuardianContacts } from '../../services/guardianContacts';
+import { loadCategoryAccess } from '../../services/categoryAccess';
 import { getAvatarComponent } from '../../components/avatars';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
 import { CATEGORIES } from '../../data/categories';
@@ -29,9 +32,9 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'VaultHome'>;
 
 const TOTAL_STORAGE_BYTES = 104_857_600; // 100 MB, matches the backend's get-upload-url cap
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-// 5 real categories (Decoy Chamber deliberately excluded — see categories.ts)
-// + 7 blank custom slots = 12 total ("ครบโหล" per feedback).
-const CUSTOM_SLOT_COUNT = 7;
+// 6 real categories (Decoy Chamber deliberately excluded — see categories.ts)
+// + 6 blank custom slots = 12 total ("ครบโหล" per feedback).
+const CUSTOM_SLOT_COUNT = 6;
 
 function formatMB(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1);
@@ -93,6 +96,32 @@ export function VaultHomeScreen({ route, navigation }: Props) {
     load();
   }, [load]);
 
+  // Which authorized-guardian name (if any) to show under each tile —
+  // feedback: "ใต้ตู้ ระบุชื่อผู้มีสิทธิเปิดตู้ (ในกรณีไม่กำหนด specific
+  // ก็ไม่ต้องระบุชื่อ)". Reloaded on focus (not just mount) so coming
+  // back from CategoryDetailScreen after saving shows the new name
+  // immediately, without needing a full remount.
+  const [categoryAuthNames, setCategoryAuthNames] = useState<Record<string, string | null>>({});
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const contacts = await loadGuardianContacts(accountId);
+        const entries = await Promise.all(
+          CATEGORIES.map(async (cat) => {
+            const access = await loadCategoryAccess(accountId, cat.id);
+            const name = access.type === 'guardian' ? contacts?.guardians[access.index]?.name ?? null : null;
+            return [cat.id, name] as const;
+          })
+        );
+        if (!cancelled) setCategoryAuthNames(Object.fromEntries(entries));
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [accountId])
+  );
+
   const handleCheckIn = async () => {
     setCheckingIn(true);
     try {
@@ -131,21 +160,10 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   // Feedback: there should be a way to explicitly close the room on
   // exit, with one more reminder that nobody — including the app's own
   // creator — can recover anything if the owner loses their own PIN/12
-  // words. Re-locks to the PIN screen if this device has one set up
-  // (SetPinScreen), otherwise all the way back to Welcome.
+  // words. This used to be an inline confirm dialog; now a full page
+  // (ExitScreen.tsx) since the warning deserves more room than a popup.
   const handleLockRoom = () => {
-    appConfirm(
-      'ปิดห้องลับ',
-      'คำเตือนอีกครั้ง: แอปนี้ ผู้ดูแล/ผู้สร้างแอป ไม่สามารถดึงหรือกู้ข้อมูลใดๆ ให้ท่านได้ทั้งนั้น ท่านต้องเก็บรักษา PIN และ 12 คำด้วยตัวเองอย่างระมัดระวัง',
-      async () => {
-        const lock = await loadDeviceLock();
-        navigation.reset({
-          index: 0,
-          routes: [lock ? { name: 'Unlock' } : { name: 'Welcome' }],
-        });
-      },
-      { confirmText: 'ปิดห้อง', cancelText: 'ยกเลิก' }
-    );
+    navigation.navigate('Exit');
   };
 
   return (
@@ -199,8 +217,9 @@ export function VaultHomeScreen({ route, navigation }: Props) {
             <View style={styles.dmsTextBlock}>
               <Text style={styles.dmsTitle}>เช็คอินความปลอดภัย</Text>
               <Text style={styles.dmsExplainer}>
-                กดปุ่มนี้เป็นระยะเพื่อบอกระบบว่า "ฉันยังอยู่" ถ้าคุณหายไปนานเกินกำหนด ระบบจะเริ่มส่งกุญแจของหมวด
-                พินัยกรรม/มรดกข้อมูล ให้ผู้ถือกุญแจสำรองที่คุณตั้งไว้
+                อย่าลืมกดปุ่ม Check in ทุกครั้ง เพื่อยืนยันว่า "ฉันยังอยู่และยังควบคุมข้อมูลของฉันเอง" หากคุณไม่กดปุ่มนี้ภายใน{' '}
+                {status?.dmsThresholdHours != null ? Math.round(status.dmsThresholdHours / 24) : '14'} วัน (ตามที่คุณเลือกในหน้าก่อน)
+                เราจะส่งรหัสกุญแจสำรองการเข้าห้องลับให้ตามชื่อที่ท่านระบุไว้ในหน้า "ระบุชื่อผู้รับรหัสกุญแจสำรอง"
               </Text>
               <Text style={styles.dmsSubtitle}>{status ? describeDms(status) : ''}</Text>
               {checkinLog && (
@@ -235,6 +254,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
           <View style={styles.grid}>
             {CATEGORIES.map((cat, i) => {
               const Icon = cat.icon;
+              const authName = categoryAuthNames[cat.id];
               return (
                 <Pressable
                   key={cat.id}
@@ -242,16 +262,22 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                   accessibilityRole="button"
                   onPress={() => navigation.navigate('CategoryDetail', { accountId, categoryId: cat.id })}
                 >
-                  {/* A small ring behind the icon — reads as a safe/vault
-                      dial rather than a plain app icon badge. */}
-                  <View style={[styles.tileDialOuter, { borderColor: `${themeColor}40` }]} />
+                  <SafeGraphic width={100} height={112} color={themeColor} />
                   <Text style={[styles.tileNumber, { color: themeColor }]}>{i + 1}</Text>
-                  <IconBadge size={40} tint={themeColor} style={styles.tileIcon}>
-                    <Icon size={20} color={colors.textPrimary} />
+                  <IconBadge size={36} tint={themeColor} style={styles.tileIcon}>
+                    <Icon size={18} color={colors.textPrimary} />
                   </IconBadge>
                   <Text style={styles.tileName} numberOfLines={2}>
                     {cat.nameTh}
                   </Text>
+                  {/* Feedback: show who's authorized, but only when a
+                      specific heir was actually chosen — "unspecified"
+                      and "secret" deliberately show nothing here. */}
+                  {authName && (
+                    <Text style={styles.tileAuthName} numberOfLines={1}>
+                      สิทธิ์: {authName}
+                    </Text>
+                  )}
                 </Pressable>
               );
             })}
@@ -265,6 +291,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                   accessibilityRole="button"
                   onPress={() => appAlert('ตั้งชื่อตู้เซฟของคุณ', 'ฟีเจอร์สร้างหมวดของคุณเองจะพร้อมใช้งานเร็วๆ นี้')}
                 >
+                  <SafeGraphic width={100} height={112} color={colors.textMuted} opacity={0.3} />
                   <Text style={styles.tileEmptyNumber}>{safeNumber}</Text>
                   <PlusIcon size={16} color={colors.textMuted} />
                   <Text style={styles.tileEmptyLabel}>ว่าง — แตะเพื่อตั้งชื่อ</Text>
@@ -366,19 +393,10 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  // A faint ring behind the icon — a stand-in "combination dial", so the
-  // tile reads as a little safe door rather than a plain settings-style
-  // icon card (feedback: "ทำช่องให้เป็นรูปตู้เซฟ").
-  tileDialOuter: {
-    position: 'absolute',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    borderWidth: 2,
-  },
   tileNumber: { ...typography.label, fontSize: 13, position: 'absolute', top: 8, left: 10 },
   tileIcon: { marginBottom: spacing.xs },
   tileName: { ...typography.body, fontSize: 13, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  tileAuthName: { ...typography.body, fontSize: 10, color: colors.textMuted, textAlign: 'center', marginTop: 2 },
   // Unnamed custom slots — a big standalone number instead of a text
   // row, so it's obviously a placeholder waiting to be named, not a
   // real safe with content.
