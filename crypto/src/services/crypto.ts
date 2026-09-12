@@ -32,6 +32,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { pbkdf2 } from '@noble/hashes/pbkdf2';
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils';
 import { gcm } from '@noble/ciphers/aes';
+import { THAI_WORDLIST } from './wordlists/thai';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -101,15 +102,23 @@ function base64ToBytes(b64: string): Uint8Array {
 // 1. generatePassphrase — 12-word BIP-39 mnemonic
 // ---------------------------------------------------------------------------
 
+export type PassphraseLanguage = 'en' | 'th';
+
 /**
- * Generates a random 12-word BIP-39 mnemonic passphrase (128 bits of
+ * Generates a random 12-word BIP-39-style mnemonic passphrase (128 bits of
  * entropy). Entropy is sourced from expo-crypto's CSPRNG, not from bip39's
  * own RNG, so no `react-native-get-random-values` polyfill is required.
+ *
+ * `language: 'th'` uses a custom 2048-word Thai wordlist (see
+ * wordlists/thai.ts) — BIP-39 has no official Thai list, so this one is
+ * app-internal only; the algorithm itself doesn't care what the words are,
+ * only that there are exactly 2048 distinct ones.
  */
-export async function generatePassphrase(): Promise<string> {
+export async function generatePassphrase(language: PassphraseLanguage = 'en'): Promise<string> {
   const entropy = await ExpoCrypto.getRandomBytesAsync(MNEMONIC_ENTROPY_BYTES);
   try {
-    return bip39.entropyToMnemonic(bytesToHex(entropy));
+    const wordlist = language === 'th' ? THAI_WORDLIST : undefined; // undefined -> bip39's default (English)
+    return bip39.entropyToMnemonic(bytesToHex(entropy), wordlist);
   } finally {
     wipe(entropy);
   }

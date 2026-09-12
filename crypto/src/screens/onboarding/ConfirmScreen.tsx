@@ -8,17 +8,18 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { deriveMasterKey, deriveAccountId } from '../../services/crypto';
+import { THAI_WORDLIST } from '../../services/wordlists/thai';
 import { useOnboarding } from './OnboardingContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Confirm'>;
 
-const WORDLIST: string[] = wordlists.english;
 const MAX_SUGGESTIONS = 3;
 const THAI_ORDINALS = ['หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า', 'สิบ', 'สิบเอ็ด', 'สิบสอง'];
 
 export function ConfirmScreen({ navigation }: Props) {
-  const { passphrase, confirmPositions, clear } = useOnboarding();
+  const { passphrase, confirmPositions, passphraseLanguage, clear } = useOnboarding();
   const targetWords = useMemo(() => passphrase?.split(' ') ?? [], [passphrase]);
+  const wordlist = passphraseLanguage === 'th' ? THAI_WORDLIST : wordlists.english;
 
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [activePosition, setActivePosition] = useState<number | null>(null);
@@ -29,8 +30,8 @@ export function ConfirmScreen({ navigation }: Props) {
     if (activePosition === null) return [];
     const query = (answers[activePosition] ?? '').trim().toLowerCase();
     if (!query) return [];
-    return WORDLIST.filter((w) => w.startsWith(query)).slice(0, MAX_SUGGESTIONS);
-  }, [activePosition, answers]);
+    return wordlist.filter((w) => w.startsWith(query)).slice(0, MAX_SUGGESTIONS);
+  }, [activePosition, answers, wordlist]);
 
   const allFilled = confirmPositions.every((p) => (answers[p] ?? '').trim().length > 0);
 

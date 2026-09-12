@@ -2,12 +2,11 @@
 //
 // Storage stats and the Dead Man's Switch check-in card are wired to the
 // REAL deployed backend (accounts row via PostgREST + RLS, dms-heartbeat
-// Edge Function) — not mock data. The 6 category rows ARE mock data: the
-// backend has no per-category schema yet (blobs aren't grouped into
-// "Personal Memory Vault" / "Critical Documents" / etc.), so their file
-// counts/sizes below just mirror the design's example numbers. Tapping one
-// shows a placeholder alert rather than a real file list (section 04,
-// "Upload / View item", isn't built yet).
+// Edge Function) — not mock data. The category rows ARE mock data: the
+// backend has no per-category schema yet (blobs aren't grouped into named
+// categories), so their file counts/sizes below just mirror the design's
+// example numbers. Tapping one shows a placeholder alert rather than a
+// real file list (section 04, "Upload / View item", isn't built yet).
 import React, { useCallback, useEffect, useState, type ComponentType } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -24,6 +23,7 @@ import {
   LayersIcon,
   GearIcon,
   ChevronRightIcon,
+  PlusIcon,
 } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, sendHeartbeat, type AccountStatus } from '../../services/backend';
@@ -32,21 +32,63 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'VaultHome'>;
 
 const TOTAL_STORAGE_BYTES = 104_857_600; // 100 MB, matches the backend's get-upload-url cap
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const CUSTOM_SLOT_COUNT = 5; // feedback: give the user a few blank safes to name themselves
 
 interface CategoryRow {
-  name: string;
+  /** Thai name — primary label per feedback (Thai first, English keyword secondary). */
+  nameTh: string;
+  nameEn: string;
+  /** What this safe is meant to hold — shown as a third line under the name. */
+  description: string;
   caption: string;
   icon: ComponentType<IconProps>;
 }
 
-// Mock — see file header. Matches the design's example data exactly.
+// Mock — see file header. Content matches the design's example data;
+// Thai-primary naming + descriptions added per user feedback.
 const CATEGORIES: CategoryRow[] = [
-  { name: 'Personal Memory Vault', caption: '18 ไฟล์ · 14.8 MB', icon: ImageStackIcon },
-  { name: 'Critical Documents', caption: '9 ไฟล์ · 11.2 MB', icon: DocumentIcon },
-  { name: 'Health & Sensitive Personal', caption: '6 ไฟล์ · 4.1 MB', icon: HeartPulseIcon },
-  { name: 'Ethical Will / Legacy', caption: '3 ไฟล์ · 1.9 MB · ผูกกับ DMS', icon: FeatherIcon },
-  { name: 'High-Sensitivity Content', caption: 'ล็อกซ้อน · ต้องใส่ PIN อีกครั้ง', icon: LockIcon },
-  { name: 'Decoy Chamber', caption: '12 ไฟล์ · จัดฉากไว้ให้ดู', icon: LayersIcon },
+  {
+    nameTh: 'ความทรงจำส่วนตัว',
+    nameEn: 'Personal Memory Vault',
+    description: 'รูปภาพ วิดีโอ ไดอารี่ หรือความทรงจำที่มีความหมายกับคุณ',
+    caption: '18 ไฟล์ · 14.8 MB',
+    icon: ImageStackIcon,
+  },
+  {
+    nameTh: 'เอกสารสำคัญ',
+    nameEn: 'Critical Documents',
+    description: 'พาสปอร์ต สัญญา โฉนดที่ดิน เอกสารราชการ',
+    caption: '9 ไฟล์ · 11.2 MB',
+    icon: DocumentIcon,
+  },
+  {
+    nameTh: 'สุขภาพและเรื่องอ่อนไหว',
+    nameEn: 'Health & Sensitive Personal',
+    description: 'ผลตรวจสุขภาพ ประวัติการรักษา ข้อมูลส่วนตัวที่ละเอียดอ่อน',
+    caption: '6 ไฟล์ · 4.1 MB',
+    icon: HeartPulseIcon,
+  },
+  {
+    nameTh: 'พินัยกรรม/มรดกข้อมูล',
+    nameEn: 'Ethical Will / Legacy',
+    description: 'สิ่งที่อยากส่งต่อให้คนที่รัก หลังจากคุณจากไป',
+    caption: '3 ไฟล์ · 1.9 MB · ผูกกับ DMS',
+    icon: FeatherIcon,
+  },
+  {
+    nameTh: 'เนื้อหาความอ่อนไหวสูง',
+    nameEn: 'High-Sensitivity Content',
+    description: 'ต้องใส่ PIN ซ้ำอีกชั้นก่อนเข้าดู',
+    caption: 'ล็อกซ้อน · ต้องใส่ PIN อีกครั้ง',
+    icon: LockIcon,
+  },
+  {
+    nameTh: 'ห้องหลอก',
+    nameEn: 'Decoy Chamber',
+    description: 'ไฟล์ธรรมดาจัดไว้ให้ดูสมจริง ใช้เมื่อถูกบังคับให้ปลดล็อก',
+    caption: '12 ไฟล์ · จัดฉากไว้ให้ดู',
+    icon: LayersIcon,
+  },
 ];
 
 function formatMB(bytes: number): string {
@@ -142,6 +184,11 @@ export function VaultHomeScreen({ route }: Props) {
             <View style={styles.dmsTextBlock}>
               <Text style={styles.dmsTitle}>เช็คอินความปลอดภัย</Text>
               <Text style={styles.dmsSubtitle}>{status ? describeDms(status) : ''}</Text>
+              {!dmsConfigured && (
+                <Text style={styles.dmsHint}>
+                  ปุ่มนี้จะกดได้เมื่อตั้งค่า Dead Man’s Switch แล้ว (หน้าตั้งค่ายังไม่ได้สร้าง)
+                </Text>
+              )}
             </View>
             <PrimaryButton
               variant="secondary"
@@ -153,25 +200,49 @@ export function VaultHomeScreen({ route }: Props) {
           </View>
 
           <View style={styles.categoryList}>
-            {CATEGORIES.map((cat) => {
+            {CATEGORIES.map((cat, i) => {
               const Icon = cat.icon;
               return (
                 <Pressable
-                  key={cat.name}
+                  key={cat.nameEn}
                   style={styles.categoryRow}
                   accessibilityRole="button"
                   onPress={() =>
-                    Alert.alert(cat.name, 'หน้ารายการไฟล์ในหมวดนี้ยังไม่ได้สร้าง (section 04 — placeholder)')
+                    Alert.alert(cat.nameTh, 'หน้ารายการไฟล์ในหมวดนี้ยังไม่ได้สร้าง (section 04 — placeholder)')
                   }
                 >
-                  <IconBadge size={42}>
-                    <Icon size={21} color={colors.textPrimary} />
+                  <IconBadge size={44}>
+                    <Icon size={22} color={colors.textPrimary} />
                   </IconBadge>
                   <View style={styles.categoryTextBlock}>
-                    <Text style={styles.categoryName}>{cat.name}</Text>
+                    <Text style={styles.safeLabel}>ตู้เซฟใบที่ {i + 1}</Text>
+                    <Text style={styles.categoryName}>
+                      {cat.nameTh} <Text style={styles.categoryNameEn}>({cat.nameEn})</Text>
+                    </Text>
+                    <Text style={styles.categoryDescription}>{cat.description}</Text>
                     <Text style={styles.categoryCaption}>{cat.caption}</Text>
                   </View>
                   <ChevronRightIcon size={18} color={colors.textMuted} />
+                </Pressable>
+              );
+            })}
+
+            {Array.from({ length: CUSTOM_SLOT_COUNT }, (_, i) => {
+              const safeNumber = CATEGORIES.length + i + 1;
+              return (
+                <Pressable
+                  key={`custom-${safeNumber}`}
+                  style={styles.categoryRow}
+                  accessibilityRole="button"
+                  onPress={() => Alert.alert('ตั้งชื่อตู้เซฟของคุณ', 'การสร้างหมวดเองยังไม่ได้สร้าง (placeholder)')}
+                >
+                  <IconBadge size={44} tint={colors.textMuted}>
+                    <PlusIcon size={20} color={colors.textMuted} />
+                  </IconBadge>
+                  <View style={styles.categoryTextBlock}>
+                    <Text style={styles.safeLabel}>ตู้เซฟใบที่ {safeNumber}</Text>
+                    <Text style={styles.emptySlotText}>แตะเพื่อตั้งชื่อหมวดของคุณเอง</Text>
+                  </View>
                 </Pressable>
               );
             })}
@@ -215,6 +286,7 @@ const styles = StyleSheet.create({
   dmsTextBlock: { flex: 1, marginRight: spacing.md },
   dmsTitle: { ...typography.body, fontSize: 14, color: colors.textPrimary, marginBottom: 2 },
   dmsSubtitle: { ...typography.body, fontSize: 12, color: colors.textMuted },
+  dmsHint: { ...typography.body, fontSize: 11, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' },
   checkinButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, minWidth: 88 },
   categoryList: { marginTop: spacing.xs, marginBottom: spacing.lg },
   categoryRow: {
@@ -226,6 +298,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   categoryTextBlock: { flex: 1 },
+  safeLabel: { ...typography.label, fontSize: 11, color: colors.accentTeal, marginBottom: 2 },
   categoryName: { ...typography.body, fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  categoryNameEn: { fontWeight: '400', color: colors.textMuted, fontSize: 13 },
+  categoryDescription: { ...typography.body, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   categoryCaption: { ...typography.body, fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  emptySlotText: { ...typography.body, fontSize: 13, color: colors.textMuted, fontStyle: 'italic' },
 });

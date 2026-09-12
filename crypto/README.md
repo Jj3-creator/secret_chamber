@@ -15,9 +15,48 @@ Kept in its own folder, independent of [`backend`](../backend) (Part 2).
 - [`src/screens/vault/VaultHomeScreen.tsx`](src/screens/vault/VaultHomeScreen.tsx) — screen 3.1, Vault Dashboard home (see below).
 - [`src/components/icons/`](src/components/icons), [`src/components/IconBadge.tsx`](src/components/IconBadge.tsx) — hand-drawn line icons (`react-native-svg`) in a soft gradient badge (`expo-linear-gradient`). Added after feedback that the empty bordered-square placeholders read as too stark/empty ("looks like a funeral") — real icons + a subtle glow give depth without breaking the design's deliberately plain, camouflaged tone.
 - [`src/services/backend.ts`](src/services/backend.ts) — thin `fetch` client for the deployed backend (Part 2): reads an account's own row via PostgREST + RLS, and calls `dms-heartbeat`.
+- [`src/services/wordlists/thai.ts`](src/services/wordlists/thai.ts) — a custom 2048-word Thai wordlist (BIP-39 has no official one) — see "Passphrase language" below.
 - [`src/polyfills.ts`](src/polyfills.ts) — must stay the first import in `App.tsx` (see "A real bug this caught" below).
 
-Tests: [`crypto.test.ts`](src/services/__tests__/crypto.test.ts), [`shamir.test.ts`](src/services/__tests__/shamir.test.ts), [`vault.test.ts`](src/services/__tests__/vault.test.ts) — 36 tests total. Plus an opt-in [`live-integration.test.ts`](src/services/__tests__/live-integration.test.ts) against the real deployed backend (see its header comment).
+Tests: [`crypto.test.ts`](src/services/__tests__/crypto.test.ts), [`shamir.test.ts`](src/services/__tests__/shamir.test.ts), [`vault.test.ts`](src/services/__tests__/vault.test.ts), [`thai-wordlist.test.ts`](src/services/__tests__/thai-wordlist.test.ts) — 45 tests total. Plus an opt-in [`live-integration.test.ts`](src/services/__tests__/live-integration.test.ts) against the real deployed backend (see its header comment).
+
+## Passphrase language (Thai / English)
+
+Feedback: some Thai users aren't comfortable reading English. BIP-39 has
+no official Thai wordlist though (only English, Japanese, Korean,
+Spanish, Chinese Simplified/Traditional, French, Italian, Czech,
+Portuguese) — the algorithm only needs *some* array of exactly 2048
+distinct strings, it doesn't care what they are, so
+[`wordlists/thai.ts`](src/services/wordlists/thai.ts) builds one as the
+cross-product of 64 common nouns × 32 common adjectives (e.g. "แมว" cat +
+"แดง" red → "แมวแดง"). That makes it 96 words to review for quality/
+duplicates instead of 2048, and duplicates in the final 2048 are
+mathematically impossible as long as the two source lists are
+duplicate-free (checked at import time and by the test suite). This list
+has **not** had an independent native-speaker linguistic review — treat
+it as a solid first pass, not a final audited wordlist.
+
+`generatePassphrase(language: 'th' | 'en' = 'en')` in crypto.ts picks the
+wordlist; a language toggle on the Welcome screen (chosen once, stored in
+`OnboardingContext`) drives it, and Confirm's autocomplete switches
+wordlists to match.
+
+## Passphrase export policy (screenshot / copy / print)
+
+Originally the design explicitly disabled screenshots and offered no
+copy button ("จดลงกระดาษ ไม่ถ่ายภาพ") — enforced only as a text claim,
+never actually implemented (there's no `expo-screen-capture` call in this
+codebase, so screenshots were never really blocked, especially not on
+web, where a page can't block the OS screenshot tool regardless).
+
+Per feedback, this is now reversed deliberately: a **คัดลอก** (copy, via
+`expo-clipboard`) button and a working **พิมพ์แผ่นสำรอง** (print backup
+sheet, via `expo-print`'s native print dialog) button on the Passphrase
+screen, plus a prominent disclaimer (styled like the warning box) stating
+the app stores nothing and isn't responsible for leaks from the user
+copying/printing/screenshotting the passphrase elsewhere — printed onto
+the backup sheet itself too. The Warning screen's middle checkbox was
+reworded to match (own-risk acknowledgment instead of a photo/cloud ban).
 
 ## Onboarding screens (screens 1.1–1.4 of the design)
 
