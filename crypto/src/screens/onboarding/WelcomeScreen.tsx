@@ -21,7 +21,8 @@ export function WelcomeScreen({ navigation }: Props) {
   const { passphraseLanguage, setPassphraseLanguage } = useOnboarding();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       {/* Content grouped near the top, not vertically centered — a flex
           spacer below absorbs the remaining space instead, so the button
           block stays pinned near the bottom without a dead gap in the middle. */}
@@ -66,17 +67,24 @@ export function WelcomeScreen({ navigation }: Props) {
         </Pressable>
         <Text style={styles.footnote}>ไม่เก็บอีเมล เบอร์โทร หรือข้อมูลระบุตัวตน</Text>
       </View>
+    </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  // Padding lives here, on an inner View, not on SafeAreaView itself — on
+  // web, SafeAreaView applies its own safe-area padding-inline CSS that
+  // can (non-deterministically, depending on atomic-CSS insertion order
+  // across the app) win the cascade over padding set on the same element,
+  // silently zeroing it and leaving content flush against the screen
+  // edges. Splitting the two elements sidesteps the conflict.
   container: {
     flex: 1,
-    backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   icon: { marginBottom: spacing.lg },
   spacer: { flex: 1, minHeight: spacing.lg },

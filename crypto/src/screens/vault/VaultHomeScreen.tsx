@@ -174,7 +174,8 @@ export function VaultHomeScreen({ route, navigation }: Props) {
 
   return (
     <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Avatar size={40} />
@@ -286,12 +287,16 @@ export function VaultHomeScreen({ route, navigation }: Props) {
           </View>
         </ScrollView>
       )}
+    </View>
     </SafeAreaView>
     </ThemedBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
+  // Padding lives here, on an inner View, not on SafeAreaView itself — see
+  // the identical comment in DoneScreen.tsx for why.
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
   header: {
     flexDirection: 'row',

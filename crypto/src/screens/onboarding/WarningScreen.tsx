@@ -27,7 +27,8 @@ export function WarningScreen({ navigation }: Props) {
   const toggle = (i: number) => setChecked((prev) => prev.map((v, idx) => (idx === i ? !v : v)));
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       <ScreenHeader step={1} totalSteps={4} onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.warningBox}>
@@ -47,12 +48,16 @@ export function WarningScreen({ navigation }: Props) {
         disabled={!allChecked}
         onPress={() => navigation.navigate('Passphrase')}
       />
+    </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  // Padding lives here, on an inner View, not on SafeAreaView itself — see
+  // the identical comment in DoneScreen.tsx for why.
+  container: { flex: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   scroll: { paddingBottom: spacing.lg },
   warningBox: {
     backgroundColor: colors.danger,

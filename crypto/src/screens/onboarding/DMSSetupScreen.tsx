@@ -126,7 +126,10 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   if (revealed) {
     return (
       <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
-      <SafeAreaView style={styles.container}>
+      {/* Padding lives on this inner View, not on SafeAreaView — see the
+          container style comment below for why. */}
+      <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
         <ScrollView>
           <Text style={styles.title}>รหัสสำหรับผู้รับแต่ละคน</Text>
           <Text style={styles.subtitle}>
@@ -143,6 +146,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           ))}
         </ScrollView>
         <PrimaryButton label="เสร็จสิ้น" onPress={finish} />
+      </View>
       </SafeAreaView>
       </ThemedBackground>
     );
@@ -150,7 +154,8 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
   return (
     <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>ตั้งค่า Dead Man's Switch (ไม่บังคับ)</Text>
         <Text style={styles.subtitle}>
@@ -228,13 +233,22 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           />
         )}
       </View>
+    </View>
     </SafeAreaView>
     </ThemedBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg },
+  safeArea: { flex: 1 },
+  // Padding lives here, on an inner View, rather than directly on
+  // SafeAreaView — on web, SafeAreaView applies its own safe-area
+  // padding-inline CSS that can (non-deterministically, depending on
+  // atomic-CSS insertion order across the app) win the cascade over
+  // paddingHorizontal set on the same element, silently zeroing it and
+  // leaving content flush against the screen edges. Splitting the two
+  // elements sidesteps the conflict regardless of insertion order.
+  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
   title: { ...typography.title, fontSize: 19, color: colors.textPrimary, marginBottom: spacing.xs },
   subtitle: { ...typography.body, fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.lg },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xl },

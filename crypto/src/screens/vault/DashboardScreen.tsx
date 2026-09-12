@@ -83,7 +83,8 @@ export function DashboardScreen({ navigation, route }: Props) {
 
   return (
     <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" hitSlop={12}>
           <ArrowLeftIcon size={20} color={colors.textPrimary} />
@@ -139,12 +140,16 @@ export function DashboardScreen({ navigation, route }: Props) {
           })}
         </ScrollView>
       )}
+    </View>
     </SafeAreaView>
     </ThemedBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
+  // Padding lives here, on an inner View, not on SafeAreaView itself — see
+  // the identical comment in DoneScreen.tsx for why.
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
   header: {
     flexDirection: 'row',

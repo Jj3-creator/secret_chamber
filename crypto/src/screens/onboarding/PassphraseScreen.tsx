@@ -84,7 +84,8 @@ export function PassphraseScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       <ScreenHeader step={2} totalSteps={4} onBack={() => navigation.goBack()} />
       <Text style={styles.title}>จด 12 คำนี้ตามลำดับ</Text>
       <Text style={styles.subtitle}>สร้างบนเครื่องคุณแบบออฟไลน์ ไม่ถูกส่งออกไปที่ไหน</Text>
@@ -124,6 +125,7 @@ export function PassphraseScreen({ navigation }: Props) {
       </View>
 
       <PrimaryButton label="จดครบแล้ว ยืนยันคำ" disabled={!words} onPress={() => navigation.navigate('Confirm')} />
+    </View>
     </SafeAreaView>
   );
 }
@@ -138,7 +140,10 @@ function WordCell({ index, word, revealed }: { index: number; word: string; reve
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  // Padding lives here, on an inner View, not on SafeAreaView itself — see
+  // the identical comment in DoneScreen.tsx for why.
+  container: { flex: 1, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   title: { ...typography.title, fontSize: 22, color: colors.textPrimary, marginBottom: spacing.xs },
   subtitle: { ...typography.subtitle, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg },
   grid: { marginBottom: spacing.md },

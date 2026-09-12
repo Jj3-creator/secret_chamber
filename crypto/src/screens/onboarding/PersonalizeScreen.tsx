@@ -39,7 +39,8 @@ export function PersonalizeScreen({ navigation, route }: Props) {
 
   return (
     <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>ตั้งชื่อและหน้าตาห้องของคุณ</Text>
         <Text style={styles.subtitle}>
@@ -100,13 +101,17 @@ export function PersonalizeScreen({ navigation, route }: Props) {
       </ScrollView>
 
       <PrimaryButton label={saving ? 'กำลังบันทึก…' : 'บันทึกและดำเนินต่อ'} onPress={handleContinue} disabled={saving} />
+    </View>
     </SafeAreaView>
     </ThemedBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg },
+  safeArea: { flex: 1 },
+  // Padding lives here, on an inner View, not on SafeAreaView itself — see
+  // the identical comment in DoneScreen.tsx for why.
+  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
   title: { ...typography.title, fontSize: 20, color: colors.textPrimary, marginBottom: spacing.xs },
   subtitle: { ...typography.body, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.lg },
   previewCard: {
