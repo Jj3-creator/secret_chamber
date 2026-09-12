@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "Secret Chamber",
+    "slug": "secret-chamber",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "secretchamber",
+    "ios": { "supportsTablet": true },
+    "android": {},
+    "plugins": ["expo-crypto"]
+  }
+}

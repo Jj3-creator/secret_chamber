@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+
+# Expo / RN build output
+.expo/
+dist/
+web-build/
+
+# secrets — never commit filled-in env files
+.env
+.env.local
+*.key
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
