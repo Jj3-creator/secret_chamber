@@ -15,7 +15,7 @@
 // wired in here; this screen only solves "remember one short thing
 // instead of 12 words", which is what was actually asked for.
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -78,40 +78,43 @@ export function SetPinScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <Text style={styles.title}>ตั้ง PIN ปลดล็อก</Text>
-        <Text style={styles.subtitle}>
-          จำ PIN สั้นๆ นี้ไว้ปลดล็อกเข้าห้องบนเครื่องนี้ทุกวัน โดยไม่ต้องพิมพ์ 12 คำซ้ำ — 12 คำที่จดไว้ยังต้องเก็บรักษาไว้เหมือนเดิม
-          (ใช้ตอนกู้คืนห้องบนเครื่องใหม่ หรือถ้าลืม PIN)
-        </Text>
+        {/* Same short-screen overflow fix as PassphraseScreen/DoneScreen/
+            WelcomeScreen — content scrolls, both buttons stay reachable. */}
+        <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Text style={styles.title}>ตั้ง PIN ปลดล็อก</Text>
+          <Text style={styles.subtitle}>
+            จำ PIN สั้นๆ นี้ไว้ปลดล็อกเข้าห้องบนเครื่องนี้ทุกวัน โดยไม่ต้องพิมพ์ 12 คำซ้ำ — 12 คำที่จดไว้ยังต้องเก็บรักษาไว้เหมือนเดิม
+            (ใช้ตอนกู้คืนห้องบนเครื่องใหม่ หรือถ้าลืม PIN)
+          </Text>
 
-        <Text style={styles.fieldLabel}>ตั้ง PIN (อย่างน้อย {MIN_PIN_LENGTH} ตัว)</Text>
-        <TextInput
-          value={pin}
-          onChangeText={setPin}
-          placeholder="เช่น 194829"
-          placeholderTextColor={colors.textMuted}
-          secureTextEntry
-          keyboardType="number-pad"
-          style={styles.input}
-        />
+          <Text style={styles.fieldLabel}>ตั้ง PIN (อย่างน้อย {MIN_PIN_LENGTH} ตัว)</Text>
+          <TextInput
+            value={pin}
+            onChangeText={setPin}
+            placeholder="เช่น 194829"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+            keyboardType="number-pad"
+            style={styles.input}
+          />
 
-        <Text style={styles.fieldLabel}>พิมพ์ PIN อีกครั้ง</Text>
-        <TextInput
-          value={confirmPin}
-          onChangeText={setConfirmPin}
-          placeholder="พิมพ์ PIN เดิมอีกครั้ง"
-          placeholderTextColor={colors.textMuted}
-          secureTextEntry
-          keyboardType="number-pad"
-          style={styles.input}
-        />
-
-        <View style={styles.spacer} />
+          <Text style={styles.fieldLabel}>พิมพ์ PIN อีกครั้ง</Text>
+          <TextInput
+            value={confirmPin}
+            onChangeText={setConfirmPin}
+            placeholder="พิมพ์ PIN เดิมอีกครั้ง"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+            keyboardType="number-pad"
+            style={styles.input}
+          />
+        </ScrollView>
 
         <PrimaryButton
           label={submitting ? 'กำลังตั้งค่า…' : 'ตั้ง PIN และดำเนินต่อ'}
           onPress={handleSetPin}
           disabled={submitting}
+          style={styles.confirmButton}
         />
         <PrimaryButton
           variant="secondary"
@@ -143,6 +146,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     ...typography.mono,
   },
-  spacer: { flex: 1, minHeight: spacing.lg },
+  scrollArea: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+  confirmButton: { marginTop: spacing.sm },
   skipButton: { marginTop: spacing.sm },
 });

@@ -1,7 +1,7 @@
 // Landing screen right after onboarding completes — reached after the
 // optional SetPin and DMSSetup steps.
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Pressable, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -45,7 +45,12 @@ export function DoneScreen({ route, navigation }: Props) {
         screen's exact combination rather than a change applied everywhere. */}
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-      <View style={styles.textBlock}>
+      {/* Feedback: expanding "รายละเอียดทางเทคนิค" adds real height — on a
+          short screen with no scroll, that content (or even just the base
+          text) could overflow past the button below with no way to reach
+          it. Same ScrollView-content + fixed-footer-button fix as
+          PassphraseScreen/WelcomeScreen. */}
+      <ScrollView style={styles.scrollArea} contentContainerStyle={styles.textBlock} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>สร้างห้องลับของคุณสำเร็จแล้ว</Text>
         <Text style={styles.reassurance}>
           เก็บรหัสกุญแจ 12 คำไว้ให้ดี ระบบจะสุ่ม 3 คำเป็นกุญแจในการเข้าห้องทุกครั้ง
@@ -66,10 +71,11 @@ export function DoneScreen({ route, navigation }: Props) {
             <Text style={styles.techLabel}>วิธีเข้ารหัส: {kdf}</Text>
           </View>
         )}
-      </View>
+      </ScrollView>
       <PrimaryButton
         label="เข้าห้องลับของฉัน (My Secret Chamber)"
         onPress={() => navigation.navigate('VaultHome', { accountId })}
+        style={styles.confirmButton}
       />
       </View>
     </SafeAreaView>
@@ -84,9 +90,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
-    justifyContent: 'space-between',
   },
-  textBlock: { flex: 1, justifyContent: 'center' },
+  scrollArea: { flex: 1 },
+  textBlock: { flexGrow: 1, justifyContent: 'center' },
+  confirmButton: { marginTop: spacing.sm },
   title: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.md },
   reassurance: { ...typography.body, fontSize: 16, color: colors.textSecondary, lineHeight: 21, marginBottom: spacing.xl },
   techToggle: { ...typography.body, fontSize: 15, color: colors.accentTeal, marginBottom: spacing.md },

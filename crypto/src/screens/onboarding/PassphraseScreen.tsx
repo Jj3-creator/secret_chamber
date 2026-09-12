@@ -1,6 +1,6 @@
 // Screen 1.3 — 12-WORD PASSPHRASE
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Print from 'expo-print';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -88,44 +88,52 @@ export function PassphraseScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safeArea}>
     <View style={styles.container}>
       <ScreenHeader step={2} totalSteps={4} onBack={() => navigation.goBack()} />
-      <Text style={styles.title}>จด 12 คำนี้ตามลำดับ</Text>
-      <Text style={styles.subtitle}>สร้างบนเครื่องคุณแบบออฟไลน์ ไม่ถูกส่งออกไปที่ไหน</Text>
+      {/* Feedback: on a real phone (shorter viewport height than this was
+          tested at) the 12-word grid + reveal button + copy/print row +
+          disclaimer box added up to more than one screenful with no way
+          to scroll — the final "จดครบแล้ว" button was simply unreachable.
+          Same ScrollView-content + fixed-footer-button pattern as
+          ConfirmScreen/WarningScreen/etc. fixes it here too. */}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>จด 12 คำนี้ตามลำดับ</Text>
+        <Text style={styles.subtitle}>สร้างบนเครื่องคุณแบบออฟไลน์ ไม่ถูกส่งออกไปที่ไหน</Text>
 
-      <View style={styles.grid}>
-        {rows.map(([left, right], rowIdx) => (
-          <View key={rowIdx} style={styles.gridRow}>
-            <WordCell index={rowIdx * 2 + 1} word={left} revealed={revealed} />
-            <WordCell index={rowIdx * 2 + 2} word={right} revealed={revealed} />
-          </View>
-        ))}
-      </View>
+        <View style={styles.grid}>
+          {rows.map(([left, right], rowIdx) => (
+            <View key={rowIdx} style={styles.gridRow}>
+              <WordCell index={rowIdx * 2 + 1} word={left} revealed={revealed} />
+              <WordCell index={rowIdx * 2 + 2} word={right} revealed={revealed} />
+            </View>
+          ))}
+        </View>
 
-      <PrimaryButton
-        variant="secondary"
-        label={revealed ? 'ซ่อนคำ' : 'แสดงคำ'}
-        onPress={() => setRevealed((v) => !v)}
-        style={styles.revealButton}
-      />
-
-      <View style={styles.actionsRow}>
-        <PrimaryButton variant="secondary" label="คัดลอก" onPress={handleCopy} disabled={!words} style={styles.actionButton} />
         <PrimaryButton
           variant="secondary"
-          label="พิมพ์แผ่นสำรอง"
-          onPress={handlePrint}
-          disabled={!words}
-          style={styles.actionButton}
+          label={revealed ? 'ซ่อนคำ' : 'แสดงคำ'}
+          onPress={() => setRevealed((v) => !v)}
+          style={styles.revealButton}
         />
-      </View>
 
-      <View style={styles.disclaimerBox}>
-        <Text style={styles.disclaimerText}>
-          แอปนี้ไม่เก็บข้อมูลใดๆ ของคุณ และไม่รับผิดชอบต่อการรั่วไหลของข้อมูล ไม่ว่าจะเกิดจากสาเหตุใดก็ตาม
-          รวมถึงกรณีที่คุณคัดลอก พิมพ์ บันทึกภาพหน้าจอ หรือแชร์ข้อมูลนี้ไปที่อื่นด้วยตัวเอง
-        </Text>
-      </View>
+        <View style={styles.actionsRow}>
+          <PrimaryButton variant="secondary" label="คัดลอก" onPress={handleCopy} disabled={!words} style={styles.actionButton} />
+          <PrimaryButton
+            variant="secondary"
+            label="พิมพ์แผ่นสำรอง"
+            onPress={handlePrint}
+            disabled={!words}
+            style={styles.actionButton}
+          />
+        </View>
 
-      <PrimaryButton label="จดครบแล้ว ยืนยันคำ" disabled={!words} onPress={() => navigation.navigate('Confirm')} />
+        <View style={styles.disclaimerBox}>
+          <Text style={styles.disclaimerText}>
+            แอปนี้ไม่เก็บข้อมูลใดๆ ของคุณ และไม่รับผิดชอบต่อการรั่วไหลของข้อมูล ไม่ว่าจะเกิดจากสาเหตุใดก็ตาม
+            รวมถึงกรณีที่คุณคัดลอก พิมพ์ บันทึกภาพหน้าจอ หรือแชร์ข้อมูลนี้ไปที่อื่นด้วยตัวเอง
+          </Text>
+        </View>
+      </ScrollView>
+
+      <PrimaryButton label="จดครบแล้ว ยืนยันคำ" disabled={!words} onPress={() => navigation.navigate('Confirm')} style={styles.confirmButton} />
     </View>
     </SafeAreaView>
   );
@@ -175,4 +183,5 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   disclaimerText: { ...typography.body, fontSize: 16, color: colors.dangerText, lineHeight: 18 },
+  confirmButton: { marginTop: spacing.sm },
 });

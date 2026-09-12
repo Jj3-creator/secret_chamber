@@ -4,7 +4,7 @@
 // words. This is the other half of "จำ password แค่ตัวเดียวได้ไม๊" —
 // SetPinScreen creates the lock, this screen consumes it.
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -102,39 +102,41 @@ export function UnlockScreen({ navigation }: Props) {
     <ThemedBackground backgroundColor={backgroundColor} accentColor={accentColor}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
-          <View style={styles.spacerTop} />
-          <View style={styles.header}>
-            <Avatar size={64} />
-            <Text style={styles.title}>{roomTitle}</Text>
-            <Text style={styles.subtitle}>ใส่ PIN เพื่อปลดล็อก</Text>
-          </View>
+          {/* Same short-screen overflow fix as the other onboarding
+              screens — unlikely to matter here (this screen's content is
+              short) but cheap insurance against the same bug class. */}
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={styles.header}>
+              <Avatar size={64} />
+              <Text style={styles.title}>{roomTitle}</Text>
+              <Text style={styles.subtitle}>ใส่ PIN เพื่อปลดล็อก</Text>
+            </View>
 
-          <TextInput
-            value={pin}
-            onChangeText={(v) => {
-              setPin(v);
-              setError(null);
-            }}
-            placeholder="PIN"
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
-            keyboardType="number-pad"
-            style={styles.input}
-            autoFocus
-          />
-          {error && <Text style={styles.error}>{error}</Text>}
+            <TextInput
+              value={pin}
+              onChangeText={(v) => {
+                setPin(v);
+                setError(null);
+              }}
+              placeholder="PIN"
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+              keyboardType="number-pad"
+              style={styles.input}
+              autoFocus
+            />
+            {error && <Text style={styles.error}>{error}</Text>}
 
-          <PrimaryButton
-            label={checking ? 'กำลังตรวจสอบ…' : 'ปลดล็อก'}
-            onPress={handleUnlock}
-            disabled={checking || pin.length === 0}
-          />
+            <PrimaryButton
+              label={checking ? 'กำลังตรวจสอบ…' : 'ปลดล็อก'}
+              onPress={handleUnlock}
+              disabled={checking || pin.length === 0}
+            />
 
-          <Pressable onPress={handleForgotPin} accessibilityRole="button" style={styles.forgotLink}>
-            <Text style={styles.forgotLinkText}>ลืม PIN?</Text>
-          </Pressable>
-
-          <View style={styles.spacerBottom} />
+            <Pressable onPress={handleForgotPin} accessibilityRole="button" style={styles.forgotLink}>
+              <Text style={styles.forgotLinkText}>ลืม PIN?</Text>
+            </Pressable>
+          </ScrollView>
         </View>
       </SafeAreaView>
     </ThemedBackground>
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
   loadingSafeArea: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
   safeArea: { flex: 1 },
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.xl },
-  spacerTop: { flex: 1, minHeight: spacing.lg },
+  scrollContent: { flexGrow: 1, justifyContent: 'center' },
   header: { alignItems: 'center', marginBottom: spacing.xl },
   title: { ...typography.title, fontSize: 20, color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' },
   subtitle: { ...typography.body, fontSize: 15, color: colors.textSecondary, marginTop: spacing.xs },
@@ -165,5 +167,4 @@ const styles = StyleSheet.create({
   error: { ...typography.body, fontSize: 16, color: colors.dangerText, marginBottom: spacing.md, textAlign: 'center' },
   forgotLink: { alignItems: 'center', paddingVertical: spacing.md },
   forgotLinkText: { ...typography.body, fontSize: 15, color: colors.textMuted },
-  spacerBottom: { flex: 2, minHeight: spacing.lg },
 });

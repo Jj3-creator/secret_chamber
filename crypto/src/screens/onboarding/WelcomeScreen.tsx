@@ -1,6 +1,6 @@
 // Screen 1.1 — WELCOME
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Pressable, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -24,38 +24,42 @@ export function WelcomeScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
     <View style={styles.container}>
-      {/* Content grouped near the top, not vertically centered — a flex
-          spacer below absorbs the remaining space instead, so the button
-          block stays pinned near the bottom without a dead gap in the middle. */}
-      <IconBadge size={60} style={styles.icon}>
-        <VaultMarkIcon size={30} color={colors.textPrimary} />
-      </IconBadge>
-      <Text style={styles.title}>ห้องแห่งความลับ</Text>
-      <Text style={styles.titleEn}>Secret Chamber</Text>
-      <Text style={styles.subtitle}>
-        แอปนี้เก็บไฟล์ลับของคุณ โดยเข้ารหัสไว้ในมือถือคุณเองเท่านั้น{'\n'}
-        ไม่มีใครเปิดดูได้ — แม้แต่คนสร้างแอปนี้ก็ตาม
-      </Text>
+      {/* Feedback: on a short real phone screen, fixed (non-scrolling)
+          content above the button block could overflow with no way to
+          reach the buttons — same class of bug as PassphraseScreen's.
+          A flex:1 ScrollView here still lets the button block sit
+          naturally at the bottom on tall screens (nothing to scroll,
+          same look as before) while making it reachable by scrolling on
+          short ones. */}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <IconBadge size={60} style={styles.icon}>
+          <VaultMarkIcon size={30} color={colors.textPrimary} />
+        </IconBadge>
+        <Text style={styles.title}>ห้องแห่งความลับ</Text>
+        <Text style={styles.titleEn}>Secret Chamber</Text>
+        <Text style={styles.subtitle}>
+          แอปนี้เก็บไฟล์ลับของคุณ โดยเข้ารหัสไว้ในมือถือคุณเองเท่านั้น{'\n'}
+          ไม่มีใครเปิดดูได้ — แม้แต่คนสร้างแอปนี้ก็ตาม
+        </Text>
 
-      <Text style={styles.languageLabel}>ภาษาของกุญแจ 12 คำ (เลือกครั้งเดียวตอนสร้างห้อง)</Text>
-      <View style={styles.languageRow}>
-        {LANGUAGE_OPTIONS.map((opt) => {
-          const active = passphraseLanguage === opt.value;
-          return (
-            <Pressable
-              key={opt.value}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              onPress={() => setPassphraseLanguage(opt.value)}
-              style={[styles.languageChip, active && styles.languageChipActive]}
-            >
-              <Text style={[styles.languageChipText, active && styles.languageChipTextActive]}>{opt.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={styles.spacer} />
+        <Text style={styles.languageLabel}>ภาษาของกุญแจ 12 คำ (เลือกครั้งเดียวตอนสร้างห้อง)</Text>
+        <View style={styles.languageRow}>
+          {LANGUAGE_OPTIONS.map((opt) => {
+            const active = passphraseLanguage === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => setPassphraseLanguage(opt.value)}
+                style={[styles.languageChip, active && styles.languageChipActive]}
+              >
+                <Text style={[styles.languageChipText, active && styles.languageChipTextActive]}>{opt.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
 
       <View>
         <PrimaryButton label="สร้างห้องใหม่" onPress={() => navigation.navigate('Warning')} />
@@ -88,7 +92,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   icon: { marginBottom: spacing.lg },
-  spacer: { flex: 1, minHeight: spacing.lg },
   title: { ...typography.title, color: colors.textPrimary, marginBottom: 2 },
   titleEn: { ...typography.body, fontSize: 16, color: colors.textMuted, marginBottom: spacing.md },
   subtitle: { ...typography.subtitle, color: colors.textSecondary, marginBottom: spacing.xl },
