@@ -12,6 +12,8 @@ Kept in its own folder, independent of [`backend`](../backend) (Part 2).
 - [`src/services/shamir.ts`](src/services/shamir.ts) — general-purpose k-of-n Shamir's Secret Sharing over GF(256).
 - [`src/services/vault.ts`](src/services/vault.ts) — built on the two above: **Decoy PIN** (real/decoy vault unlock) and **Dead Man's Switch recovery** (2-of-3 guardian shares), matching the "Onboarding / Register" and decision-point notes in the design.
 - [`src/screens/onboarding/`](src/screens/onboarding), [`src/navigation/`](src/navigation), [`src/components/`](src/components), [`src/theme/`](src/theme) — real, working Onboarding UI (see below).
+- [`src/screens/vault/VaultHomeScreen.tsx`](src/screens/vault/VaultHomeScreen.tsx) — screen 3.1, Vault Dashboard home (see below).
+- [`src/services/backend.ts`](src/services/backend.ts) — thin `fetch` client for the deployed backend (Part 2): reads an account's own row via PostgREST + RLS, and calls `dms-heartbeat`.
 - [`src/polyfills.ts`](src/polyfills.ts) — must stay the first import in `App.tsx` (see "A real bug this caught" below).
 
 Tests: [`crypto.test.ts`](src/services/__tests__/crypto.test.ts), [`shamir.test.ts`](src/services/__tests__/shamir.test.ts), [`vault.test.ts`](src/services/__tests__/vault.test.ts) — 36 tests total. Plus an opt-in [`live-integration.test.ts`](src/services/__tests__/live-integration.test.ts) against the real deployed backend (see its header comment).
@@ -25,8 +27,9 @@ Welcome → Warning (3 acknowledgement checkboxes gate the button) →
 Passphrase (real generatePassphrase(), hide/reveal, 3 random confirm
 positions picked) → Confirm (3 word inputs w/ BIP-39 autocomplete,
 validates against the real passphrase, then calls deriveMasterKey +
-deriveAccountId and drops the passphrase from memory) → Done (placeholder
-— shows the real derived account_id; Vault Home isn't designed yet)
+deriveAccountId and drops the passphrase from memory) → Done (shows the
+real derived account_id, then a temporary shortcut button straight into
+VaultHome — screens 1.5 and section 02 Login/Unlock aren't built yet)
 ```
 
 The in-progress passphrase lives only in [`OnboardingContext`](src/screens/onboarding/OnboardingContext.tsx) (React state), never in a navigation route param — route params can end up in devtools/persisted nav state, which the "zero memory traces" design explicitly wants to avoid. `clear()` drops it the moment Confirm succeeds.
@@ -36,6 +39,55 @@ The in-progress passphrase lives only in [`OnboardingContext`](src/screens/onboa
 ### A real bug this caught
 
 Running the actual app surfaced something `npm test` couldn't: `bip39` uses Node's **global** `Buffer` internally, which neither a browser nor React Native provides by default. `generatePassphrase()` threw `ReferenceError: Buffer is not defined` the first time it ran for real — the Jest suite never caught this because Node (Jest's test environment) already has a real global `Buffer`, masking the gap. Fixed by [`src/polyfills.ts`](src/polyfills.ts), imported first in `App.tsx`. If you ever restructure the entry point, keep that import first.
+
+## The full design (all 16 screens)
+
+The Claude Design canvas ("Secret Chamber Flow") turned out to have a
+compiled `Secret Chamber Flow.html` export covering everything — not just
+the Onboarding section screenshotted earlier. Full breakdown, section by
+section:
+
+1. **Onboarding / Register** (5 screens, not 4) — 1.1 Welcome, 1.2 Warning,
+   1.3 12-word passphrase, 1.4 Confirm, **1.5 Set Real + Decoy PIN** (not
+   built yet — maps directly to `vault.ts`'s `setupDualPin`).
+2. **Login / Unlock** (3 screens) — 2.1 PIN keypad, 2.2 Passphrase-based
+   recovery unlock, 2.3 Decoy Chamber result screen. Not built yet.
+3. **Vault Dashboard** (2 screens) — 3.1 Home (**built**, see below), 3.2
+   second-layer PIN lock for the High-Sensitivity category. Not built yet.
+4. **Upload / View item** (3 screens) — category file list, upload sheet,
+   temporary-decrypt file viewer. Not built yet.
+5. **Settings** (3 screens) — all settings, DMS recipients & conditions
+   (confirms the design wants exactly the 2-of-3 Shamir threshold and a
+   staged D-3/D-1/D-0 warning schedule before releasing shares — matches
+   what `backend/`'s DMS Edge Functions already implement), change-PIN.
+   Not built yet.
+
+## Vault Home (screen 3.1)
+
+[`VaultHomeScreen.tsx`](src/screens/vault/VaultHomeScreen.tsx) — reachable
+from the Done screen's temporary shortcut button. Split of real vs. mock:
+
+- **Real**: storage used/remaining (via `backend.ts`'s `getAccountStatus`,
+  a direct PostgREST read gated by the `accounts_select_own` RLS policy —
+  verified with curl that a mismatched `x-account-id` header is blocked
+  before wiring the UI to it) and the Dead Man's Switch check-in card
+  (`sendHeartbeat`, hits the real deployed `dms-heartbeat` function —
+  verified server-side that the timestamp actually advances after tapping
+  the button).
+- **Mock**: the 6 category rows (Personal Memory Vault, Critical
+  Documents, Health & Sensitive Personal, Ethical Will/Legacy,
+  High-Sensitivity Content, Decoy Chamber) — the backend has no
+  per-category schema yet (`blobs` isn't grouped), so these mirror the
+  design's example file counts/sizes verbatim. Tapping one shows a
+  placeholder alert.
+
+Verified end-to-end against the live backend: ran onboarding twice to get
+two real `account_id`s, confirmed a fresh account shows 0/100MB and "DMS
+not configured", then called `dms-setup` directly for one account and
+confirmed VaultHome rendered the correct day count (336h → "14 วัน") and
+that tapping "เช็คอิน" genuinely advanced `dms_heartbeat_at` server-side
+(checked via a direct table read, not just the UI). Both test accounts
+were deleted afterward.
 
 ### Try it yourself
 

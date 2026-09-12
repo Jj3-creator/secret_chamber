@@ -7,6 +7,7 @@ import { WarningScreen } from '../screens/onboarding/WarningScreen';
 import { PassphraseScreen } from '../screens/onboarding/PassphraseScreen';
 import { ConfirmScreen } from '../screens/onboarding/ConfirmScreen';
 import { DoneScreen } from '../screens/onboarding/DoneScreen';
+import { VaultHomeScreen } from '../screens/vault/VaultHomeScreen';
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
@@ -14,12 +15,15 @@ export type OnboardingStackParamList = {
   Passphrase: undefined;
   Confirm: undefined;
   /**
-   * Placeholder landing screen — the "1. Onboarding / Register" section of
-   * the design ends at Confirm (screens 1.1-1.4); Vault Home hasn't been
-   * designed/built yet. Done just proves the pipeline completed and shows
-   * the derived account_id, nothing more.
+   * Placeholder landing screen right after Confirm. The design's section
+   * "1. Onboarding / Register" actually continues to 1.5 (set Real + Decoy
+   * PIN) before reaching the dashboard — not built yet, so Done offers a
+   * direct shortcut into VaultHome instead, clearly labeled as a temporary
+   * bridge rather than the real flow.
    */
   Done: { accountId: string; kdf: string };
+  /** Screen 3.1 — Vault Dashboard home. See VaultHomeScreen.tsx for what's real vs. mock. */
+  VaultHome: { accountId: string };
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
@@ -33,6 +37,7 @@ export function OnboardingNavigator() {
         <Stack.Screen name="Passphrase" component={PassphraseScreen} />
         <Stack.Screen name="Confirm" component={ConfirmScreen} />
         <Stack.Screen name="Done" component={DoneScreen} />
+        <Stack.Screen name="VaultHome" component={VaultHomeScreen} />
       </Stack.Navigator>
     </OnboardingProvider>
   );

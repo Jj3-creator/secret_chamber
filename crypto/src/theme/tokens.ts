@@ -17,6 +17,8 @@ export const colors = {
   textMuted: '#6B6B75',
   accent: '#E7E5DF',
   accentText: '#111114',
+  /** Muted teal — used for status/progress indicators (storage bar, DMS check-in), sampled from the design canvas export. */
+  accentTeal: '#7FA6B1',
   danger: '#3A1518',
   dangerBorder: '#5C2228',
   dangerText: '#F3B7BB',
