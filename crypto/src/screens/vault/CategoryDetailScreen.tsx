@@ -23,6 +23,7 @@ import type { OnboardingStackParamList } from '../../navigation/OnboardingNaviga
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
 import { ThemedBackground } from '../../components/ThemedBackground';
+import { SafeGraphic } from '../../components/SafeGraphic';
 import { RadioOption } from '../../components/RadioOption';
 import { ArrowLeftIcon, DocumentIcon } from '../../components/icons';
 import { appAlert, appConfirm } from '../../components/AppAlert';
@@ -233,9 +234,14 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.heroCard}>
-              <IconBadge size={56} tint={accentColor}>
-                <Icon size={28} color={colors.textPrimary} />
-              </IconBadge>
+              {/* Feedback: match the safe-graphic tile art used on
+                  VaultHome's grid, instead of a plain icon badge here. */}
+              <View style={styles.heroArt}>
+                <SafeGraphic width={90} height={100} color={accentColor} />
+                <IconBadge size={56} tint={accentColor}>
+                  <Icon size={28} color={colors.textPrimary} />
+                </IconBadge>
+              </View>
               {isCustom ? (
                 // Feedback: safes 7-12 are user-defined topics — let the
                 // owner name (and rename) this one right here, instead of
@@ -245,7 +251,7 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
                 // typing) — an explicit "ชื่อตู้เซฟนี้" label above the
                 // input makes clear it's just this safe's own name.
                 <>
-                  <Text style={styles.nameFieldLabel}>ชื่อตู้เซฟนี้ (ไม่ใช่ชื่อผู้มีสิทธิ์เข้าถึง)</Text>
+                  <Text style={styles.nameFieldLabel}>ชื่อตู้เซฟนี้</Text>
                   <TextInput
                     value={customName}
                     onChangeText={setCustomName}
@@ -411,6 +417,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     gap: spacing.sm,
   },
+  heroArt: { width: 90, height: 100, alignItems: 'center', justifyContent: 'center' },
   categoryName: { ...typography.body, fontSize: 17, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
   categoryNameEn: { fontWeight: '400', color: colors.textMuted, fontSize: 14 },
   categoryDescription: { ...typography.body, fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },

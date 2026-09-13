@@ -246,11 +246,11 @@ export function DashboardScreen({ navigation, route }: Props) {
               <IconBadge size={32} tint={colors.dangerText}>
                 <LockClosedIcon size={16} color={colors.textPrimary} />
               </IconBadge>
-              <Text style={styles.cardTitle}>วันที่ผู้ถือกุญแจสำรองเริ่มกู้คืนได้</Text>
+              <Text style={styles.cardTitle}>วันที่รหัสกุญแจสำรองเริ่มใช้งานได้</Text>
             </View>
             <Text style={styles.cardSubtext}>
               {roomStatus?.notifyDueAt
-                ? `${formatThaiDate(roomStatus.notifyDueAt)} — ถ้าคุณไม่เข้าห้องนี้เลยก่อนวันนี้ (ระบบข้อความแจ้งเตือนอัตโนมัติถึงผู้ถูกระบุชื่อให้ถือรหัสสำรอง — ฟีเจอร์นี้ยังไม่เปิดใช้งาน)`
+                ? `${formatThaiDate(roomStatus.notifyDueAt)} — ถ้าคุณไม่เข้าห้องนี้เลยก่อนวันนี้ (วันที่ระบบแจ้งเตือนอัตโนมัติแก่รายชื่อผู้ถือกุญแจสำรอง — ฟีเจอร์นี้ยังไม่เปิดใช้งาน)`
                 : 'ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท'}
             </Text>
           </View>
