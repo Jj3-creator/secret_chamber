@@ -99,6 +99,19 @@ describe('deriveKeyDeterministic', () => {
     const random = await deriveMasterKey('random vs deterministic comparison phrase');
     expect(deterministic.masterKeyHex).not.toBe(random.masterKeyHex);
   });
+
+  // Regression guard for a real cross-platform bug: react-native-argon2 is
+  // a genuine compiled native module in this project — unavailable on web
+  // or plain Expo Go today, but would load on a real EAS-built native app.
+  // If deriveKeyDeterministic ever silently allowed Argon2id again, a room
+  // created on that native build would use a different KDF (and therefore
+  // a different key) than the exact same 12 words typed on web — making
+  // recovery across platforms fail with no error. Always pbkdf2 here,
+  // regardless of what's available on the current platform, is the fix.
+  it('always uses pbkdf2-sha256, never argon2id, regardless of platform availability', async () => {
+    const result = await deriveKeyDeterministic('kdf pinning regression test phrase');
+    expect(result.kdf).toBe('pbkdf2-sha256');
+  });
 });
 
 describe('encryptData / decryptData round-trip', () => {

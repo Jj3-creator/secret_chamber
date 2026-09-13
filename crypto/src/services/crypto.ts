@@ -221,12 +221,30 @@ const DETERMINISTIC_SALT_HEX = bytesToHex(sha256(utf8ToBytes('secret-chamber:det
  * here specifically (and wrong for low-entropy PINs).
  */
 export async function deriveKeyDeterministic(secret: string): Promise<MasterKeyResult> {
-  return deriveMasterKey(secret, DETERMINISTIC_SALT_HEX);
+  // allowArgon2id: false — see deriveMasterKey's own param for why. This
+  // path's whole point is "the same input reproduces the same key on ANY
+  // device/platform" (room recovery, guardian token redemption); Argon2id
+  // is a REAL native module in this project (react-native-argon2, with
+  // compiled Android/iOS code) that simply can't load on web or in plain
+  // Expo Go today — but WOULD load on a real EAS-built native app, and a
+  // room created on that build would then be unrecoverable from web (or
+  // vice versa), since Argon2id and PBKDF2 produce entirely different
+  // keys from the same passphrase+salt. Forcing PBKDF2 here keeps this
+  // path's output identical across every platform, permanently.
+  return deriveMasterKey(secret, DETERMINISTIC_SALT_HEX, false);
 }
 
 export async function deriveMasterKey(
   passphrase: string,
-  existingSaltHex?: string
+  existingSaltHex?: string,
+  // PIN derivation (derivePinKey, via plain deriveMasterKey calls) stays
+  // per-device by design already — a PIN set on one device is never
+  // expected to unlock a different one — so letting THAT path use
+  // whichever KDF is available (Argon2id when a real native build can
+  // load it, PBKDF2 otherwise) is fine, and arguably a nice security
+  // bonus where it's available. Only deriveKeyDeterministic needs this
+  // pinned to false, for the cross-platform reason explained there.
+  allowArgon2id = true
 ): Promise<MasterKeyResult> {
   const salt = existingSaltHex
     ? hexToBytes(existingSaltHex)
@@ -236,7 +254,7 @@ export async function deriveMasterKey(
   let masterKey: Uint8Array | null = null;
 
   try {
-    const argonKey = await tryArgon2id(passphrase, salt);
+    const argonKey = allowArgon2id ? await tryArgon2id(passphrase, salt) : null;
     if (argonKey) {
       masterKey = argonKey;
       return { masterKeyHex: bytesToHex(masterKey), saltHex: bytesToHex(salt), kdf: 'argon2id' };
