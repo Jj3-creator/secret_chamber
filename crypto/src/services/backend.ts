@@ -62,20 +62,24 @@ export async function getAccountStatus(accountId: string): Promise<AccountStatus
   };
 }
 
-/** Result of a successful check-in. null means DMS isn't configured for this account. */
+/**
+ * Result of a successful check-in — always succeeds now (see
+ * dms-heartbeat/index.ts's own comment on why): it always bumps
+ * last_active_at (the 1-year auto-delete clock) even when DMS/guardians
+ * were never configured. dmsThresholdHours is null in exactly that case.
+ */
 export interface HeartbeatResult {
   dmsHeartbeatAt: string;
-  dmsThresholdHours: number;
+  dmsThresholdHours: number | null;
 }
 
-export async function sendHeartbeat(accountId: string): Promise<HeartbeatResult | null> {
+export async function sendHeartbeat(accountId: string): Promise<HeartbeatResult> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/dms-heartbeat`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ account_id: accountId }),
   });
 
-  if (res.status === 400) return null; // dms_not_configured — a valid, expected state
   if (!res.ok) throw new Error(`sendHeartbeat: unexpected ${res.status}`);
 
   const body = await res.json();

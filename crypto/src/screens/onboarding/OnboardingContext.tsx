@@ -26,12 +26,23 @@ interface OnboardingState {
   passphraseLanguage: PassphraseLanguage;
   /** Transient — only alive between Confirm and DMS Setup/Personalize. */
   masterKeyHex: string | null;
+  /**
+   * Set by RecoverScreen — this room's DMS/guardians may already be
+   * configured server-side, so Personalize skips straight to Done
+   * instead of routing through DMSSetupScreen's fresh-onboarding form
+   * (which would silently REPLACE any existing guardians with blank
+   * slots if submitted). Reconfiguring guardians after recovery goes
+   * through SettingsScreen -> DMSSetupScreen's own "reconfigure" mode
+   * instead, which correctly prefills the existing setup first.
+   */
+  isRecovering: boolean;
 }
 
 interface OnboardingContextValue extends OnboardingState {
   setPassphraseLanguage: (language: PassphraseLanguage) => void;
   setPassphrase: (passphrase: string, confirmPositions: number[]) => void;
   setMasterKeyHex: (masterKeyHex: string) => void;
+  setIsRecovering: (isRecovering: boolean) => void;
   /** Drops just the passphrase (Confirm succeeded) — masterKeyHex may still be needed by DMS Setup. */
   clearPassphrase: () => void;
   /** Full reset, once masterKeyHex is no longer needed either (DMS Setup done/skipped). */
@@ -45,6 +56,7 @@ const INITIAL_STATE: OnboardingState = {
   confirmPositions: [],
   passphraseLanguage: 'th',
   masterKeyHex: null,
+  isRecovering: false,
 };
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
@@ -58,13 +70,15 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const setMasterKeyHex = (masterKeyHex: string) => setState((prev) => ({ ...prev, masterKeyHex }));
 
+  const setIsRecovering = (isRecovering: boolean) => setState((prev) => ({ ...prev, isRecovering }));
+
   const clearPassphrase = () => setState((prev) => ({ ...prev, passphrase: null, confirmPositions: [] }));
 
   const clear = () => setState((prev) => ({ ...INITIAL_STATE, passphraseLanguage: prev.passphraseLanguage }));
 
   return (
     <OnboardingContext.Provider
-      value={{ ...state, setPassphraseLanguage, setPassphrase, setMasterKeyHex, clearPassphrase, clear }}
+      value={{ ...state, setPassphraseLanguage, setPassphrase, setMasterKeyHex, setIsRecovering, clearPassphrase, clear }}
     >
       {children}
     </OnboardingContext.Provider>

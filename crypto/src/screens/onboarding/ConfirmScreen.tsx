@@ -7,7 +7,7 @@ import type { OnboardingStackParamList } from '../../navigation/OnboardingNaviga
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, spacing, typography } from '../../theme/tokens';
-import { deriveMasterKey, deriveAccountId } from '../../services/crypto';
+import { deriveKeyDeterministic, deriveAccountId } from '../../services/crypto';
 import { THAI_WORDLIST } from '../../services/wordlists/thai';
 import { useOnboarding } from './OnboardingContext';
 
@@ -48,7 +48,12 @@ export function ConfirmScreen({ navigation }: Props) {
 
     setBusy(true);
     try {
-      const { masterKeyHex, kdf } = await deriveMasterKey(passphrase);
+      // Deterministic (fixed salt), not deriveMasterKey's own default
+      // random salt — the whole point of "12 words recover your room" is
+      // that the SAME words always re-derive the SAME key; a random salt
+      // with nowhere to persist it would make that impossible. See
+      // crypto.ts's DETERMINISTIC_SALT_HEX for the full reasoning.
+      const { masterKeyHex, kdf } = await deriveKeyDeterministic(passphrase);
       const accountId = deriveAccountId(masterKeyHex);
       setMasterKeyHex(masterKeyHex); // SetPin/DMS Setup may still need it — cleared once DMS Setup finishes/skips
       clearPassphrase(); // done with the passphrase itself either way

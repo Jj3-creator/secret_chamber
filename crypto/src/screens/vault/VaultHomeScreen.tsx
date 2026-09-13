@@ -12,12 +12,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
-import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
 import { ThemedBackground } from '../../components/ThemedBackground';
 import { SafeGraphic } from '../../components/SafeGraphic';
 import { appAlert } from '../../components/AppAlert';
-import { GearIcon, ChartIcon, PlusIcon, CheckCircleIcon, DoorExitIcon, DocumentIcon } from '../../components/icons';
+import { GearIcon, ChartIcon, PlusIcon, DoorExitIcon, DocumentIcon } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { getAccountStatus, sendHeartbeat, type AccountStatus } from '../../services/backend';
 import { loadRoomProfile, type RoomProfile } from '../../services/localProfile';
@@ -67,30 +66,56 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   const [status, setStatus] = useState<AccountStatus | null>(null);
   const [profile, setProfile] = useState<RoomProfile | null>(null);
   const [checkinLog, setCheckinLog] = useState<CheckinLog | null>(null);
-  const [justCheckedIn, setJustCheckedIn] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { accentColor, backgroundColor, setThemeId } = useRoomTheme();
   const { setFontScaleId, scaled } = useFontScale();
 
+  // Feedback: "ไม่จำเป็นต้องแยกปุ่ม log in กับ check in ... ทุกครั้งที่
+  // ผู้ใช้ Login เข้ามาสำเร็จ ถือว่าเป็นหลักฐานที่ชัดเจนที่สุดแล้วว่า
+  // 'ผู้ใช้ยังอยู่และยังควบคุมบัญชีได้'" — a successful PIN unlock (which
+  // is exactly what leads to this screen mounting, whether fresh from
+  // Unlock or right after onboarding) now COUNTS as the check-in itself.
+  // No separate button; this runs once, here, as part of loading the
+  // screen — never gated on DMS being configured (see dms-heartbeat's own
+  // comment: it must always push back the 1-year auto-delete clock,
+  // guardians or not).
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [accountStatus, roomProfile, log] = await Promise.all([
-        getAccountStatus(accountId),
-        loadRoomProfile(accountId),
-        loadCheckinLog(accountId),
-      ]);
+      let heartbeat: { dmsHeartbeatAt: string; dmsThresholdHours: number | null } | null = null;
+      try {
+        heartbeat = await sendHeartbeat(accountId);
+      } catch {
+        // A failed check-in (offline, backend hiccup) shouldn't block
+        // seeing the rest of the room — status below still loads with
+        // whatever the server already had.
+      }
+      const [accountStatus, roomProfile] = await Promise.all([getAccountStatus(accountId), loadRoomProfile(accountId)]);
       setStatus(accountStatus);
       setProfile(roomProfile);
-      setCheckinLog(log);
       // Restore the saved theme/font-size into the shared contexts —
       // covers opening this screen fresh (e.g. a future direct
       // re-entry/unlock flow) rather than relying on Personalize/Settings
       // having just set it live.
       if (roomProfile?.themeId) setThemeId(roomProfile.themeId);
       if (roomProfile?.fontScaleId) setFontScaleId(roomProfile.fontScaleId);
+
+      if (heartbeat) {
+        const log = await recordCheckin(accountId);
+        setCheckinLog(log);
+        const dayCount =
+          heartbeat.dmsThresholdHours != null ? Math.round(heartbeat.dmsThresholdHours / 24) : null;
+        appAlert(
+          'เข้าสู่ระบบสำเร็จ',
+          dayCount != null
+            ? `— อัปเดตสถานะแจ้งเตือนอัตโนมัติแล้ว (นับถอยหลัง ${dayCount} วันเริ่มใหม่วันนี้)\n— อัปเดตสถานะห้องลบตัวเองอัตโนมัติแล้ว (นับถอยหลัง 365 วันเริ่มใหม่วันนี้)`
+            : '— อัปเดตสถานะห้องลบตัวเองอัตโนมัติแล้ว (นับถอยหลัง 365 วันเริ่มใหม่วันนี้)'
+        );
+      } else {
+        const log = await loadCheckinLog(accountId);
+        setCheckinLog(log);
+      }
     } catch {
       setError('โหลดสถานะห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
     } finally {
@@ -135,44 +160,6 @@ export function VaultHomeScreen({ route, navigation }: Props) {
     }, [accountId])
   );
 
-  const handleCheckIn = async () => {
-    // Feedback: reported repeatedly as "ปุ่มเช็คอินไม่ activate" — the
-    // button used to be hard-`disabled` whenever !dmsConfigured, which
-    // silently eats every tap with zero feedback (a disabled Pressable
-    // never fires onPress at all). A button that does nothing when
-    // tapped reads as "broken", not "needs setup first". Now the button
-    // is never hard-disabled for that reason — tapping it always at
-    // least explains why, same as the already-existing "DMS not
-    // configured" branch below for the network-confirmed case.
-    if (!dmsConfigured) {
-      appAlert('ยังเช็คอินไม่ได้', 'ต้องตั้งค่ากุญแจไขความลับสำหรับทายาทก่อน ถึงจะเปิดใช้ปุ่มนี้ได้');
-      return;
-    }
-    setCheckingIn(true);
-    try {
-      const result = await sendHeartbeat(accountId);
-      if (result) {
-        setStatus((prev) =>
-          prev ? { ...prev, dmsHeartbeatAt: result.dmsHeartbeatAt, dmsThresholdHours: result.dmsThresholdHours } : prev
-        );
-        // Feedback: the countdown text often reads identical before and
-        // after a successful check-in (it just resets to the same
-        // starting value, e.g. "ครบกำหนดอีก 14 วัน" both times), so
-        // pressing the button looked like it did nothing. This local
-        // counter + timestamp always visibly changes.
-        const log = await recordCheckin(accountId);
-        setCheckinLog(log);
-        setJustCheckedIn(true);
-        setTimeout(() => setJustCheckedIn(false), 2500);
-      } else {
-        appAlert('เช็คอิน', 'บัญชีนี้ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท');
-      }
-    } catch {
-      appAlert('เช็คอิน', 'เช็คอินไม่สำเร็จ ลองใหม่อีกครั้ง');
-    } finally {
-      setCheckingIn(false);
-    }
-  };
 
   const usedBytes = status?.storageUsedBytes ?? 0;
   const usedFraction = Math.min(1, usedBytes / TOTAL_STORAGE_BYTES);
@@ -238,42 +225,32 @@ export function VaultHomeScreen({ route, navigation }: Props) {
             </View>
           </View>
 
-          {/* Feedback: the old side-by-side row (long paragraph squeezed
-              next to the button) read badly on a narrow phone and made
-              the button hard to hit reliably. Stacked layout instead —
-              text on top, full-width button below, always reachable. */}
+          {/* Feedback: "ไม่จำเป็นต้องแยกปุ่ม log in กับ check in ...
+              เปลี่ยนการแสดงผลเป็นการแจ้งเตือนสถานะแทน" — check-in now
+              happens automatically on every successful login (see
+              load()'s own comment above); this card is purely
+              informational, no button. */}
           <View style={[styles.card, styles.dmsCard]}>
             <View style={styles.dmsTextBlock}>
-              <Text style={[styles.dmsTitle, { fontSize: scaled(16) }]}>เช็คอินความปลอดภัย</Text>
+              <Text style={[styles.dmsTitle, { fontSize: scaled(16) }]}>สถานะความปลอดภัย</Text>
               <Text style={[styles.dmsExplainer, { fontSize: scaled(15) }]}>
-                อย่าลืมกดปุ่ม Check in ทุกครั้ง เพื่อยืนยันว่า "ฉันยังอยู่และยังควบคุมข้อมูลของฉันเอง" หากคุณไม่กดปุ่มนี้ภายใน{' '}
+                ทุกครั้งที่คุณเข้าห้องนี้สำเร็จ (ปลดล็อกด้วย PIN) ถือว่าเช็คอินให้อัตโนมัติแล้ว — ไม่ต้องกดปุ่มอะไรเพิ่ม
+                หากคุณไม่เข้าห้องนี้เลยเกิน{' '}
                 {status?.dmsThresholdHours != null ? Math.round(status.dmsThresholdHours / 24) : '14'} วัน (ตามที่คุณเลือกในหน้าก่อน)
                 เราจะส่งรหัสกุญแจสำรองการเข้าห้องลับให้ตามชื่อที่ท่านระบุไว้ในหน้า "ระบุชื่อผู้รับรหัสกุญแจสำรอง"
               </Text>
               <Text style={styles.dmsSubtitle}>{status ? describeDms(status) : ''}</Text>
               {checkinLog && (
                 <Text style={styles.checkinLogText}>
-                  เช็คอินครั้งที่ {checkinLog.count} — ล่าสุด {formatThaiDateTime(checkinLog.lastCheckinAt)}
+                  เข้าห้องแล้ว {checkinLog.count} ครั้ง — ล่าสุด {formatThaiDateTime(checkinLog.lastCheckinAt)}
                 </Text>
               )}
               {!dmsConfigured && (
-                <Text style={styles.dmsHint}>ปุ่มนี้จะกดได้เมื่อตั้งค่ากุญแจไขความลับสำหรับทายาทแล้ว</Text>
+                <Text style={styles.dmsHint}>
+                  ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท — แต่การเข้าห้องยังนับเป็นการยืนยันตัวตนเพื่อไม่ให้ห้องถูกลบอัตโนมัติเช่นเดิม
+                </Text>
               )}
             </View>
-            {justCheckedIn ? (
-              <View style={[styles.checkinButton, styles.checkinSuccess, { borderColor: accentColor }]}>
-                <CheckCircleIcon size={18} color={accentColor} />
-                <Text style={[styles.checkinSuccessText, { color: accentColor }]}>เช็คอินแล้ว</Text>
-              </View>
-            ) : (
-              <PrimaryButton
-                variant="secondary"
-                label={checkingIn ? 'กำลังเช็คอิน…' : 'เช็คอิน'}
-                disabled={checkingIn}
-                onPress={handleCheckIn}
-                style={styles.checkinButton}
-              />
-            )}
           </View>
 
           {/* Feedback: laid out as a 3x4 grid of "safe" tiles — empty
@@ -404,18 +381,6 @@ const styles = StyleSheet.create({
   dmsSubtitle: { ...typography.body, fontSize: 16, color: colors.textMuted },
   dmsHint: { ...typography.body, fontSize: 16, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' },
   checkinLogText: { ...typography.body, fontSize: 13, color: colors.textMuted, marginTop: 6 },
-  checkinButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, width: '100%' },
-  checkinSuccess: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    borderWidth: 1.5,
-    borderRadius: 14,
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    width: '100%',
-  },
-  checkinSuccessText: { ...typography.label, fontSize: 14 },
   // 3-column grid of "safe" tiles (feedback: rows of text felt like a
   // file list, not a room of safes — this reads more like a wall of
   // safes at a glance, with empty ones visibly empty).

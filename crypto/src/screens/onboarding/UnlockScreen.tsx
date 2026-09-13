@@ -9,7 +9,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ThemedBackground } from '../../components/ThemedBackground';
-import { appAlert } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { derivePinKey, unwrapVaultKey } from '../../services/vault';
 import { loadDeviceLock, type DeviceLock } from '../../services/deviceLock';
@@ -80,11 +79,12 @@ export function UnlockScreen({ navigation }: Props) {
     }
   };
 
+  // Feedback: this used to just show a "coming soon" alert whose only
+  // real suggestion was "start over from the app's first page" — which
+  // actually means CREATE A NEW ROOM, not recover this one. Now goes
+  // straight into the real recovery flow (RecoverScreen.tsx).
   const handleForgotPin = () => {
-    appAlert(
-      'ลืม PIN?',
-      'การกู้คืนด้วย 12 คำจากเครื่องนี้จะพร้อมใช้งานเร็วๆ นี้ — ระหว่างนี้ต้องใช้ 12 คำเริ่มต้นใหม่จากหน้าแรกของแอป'
-    );
+    navigation.navigate('Recover');
   };
 
   if (lock === undefined) {

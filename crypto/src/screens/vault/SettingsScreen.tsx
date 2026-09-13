@@ -264,19 +264,19 @@ export function SettingsScreen({ navigation, route }: Props) {
               style={styles.saveButton}
             />
 
-            <Text style={styles.sectionLabel}>ผู้ถือกุญแจสำรอง / รอบเช็คอิน</Text>
+            <Text style={styles.sectionLabel}>ผู้ถือกุญแจสำรอง / กรอบเวลาเปิดสิทธิ์</Text>
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
                 {loadingNotify
                   ? 'กำลังโหลด…'
                   : notifyDueAt
-                    ? `วันที่ผู้ถือกุญแจสำรองขอรหัสได้: ${formatThaiDate(notifyDueAt)} — ถ้าคุณไม่เช็คอินก่อนวันนี้`
+                    ? `วันที่ผู้ถือกุญแจสำรองเริ่มกู้คืนได้: ${formatThaiDate(notifyDueAt)} — ถ้าคุณไม่เข้าห้องนี้เลยก่อนวันนี้ (การแจ้งเตือนอัตโนมัติยังไม่เปิดใช้งาน)`
                     : 'ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท'}
               </Text>
             </View>
             <PrimaryButton
               variant="secondary"
-              label="แก้ไขผู้ถือกุญแจสำรอง / รอบเช็คอิน"
+              label="แก้ไขผู้ถือกุญแจสำรอง / กรอบเวลา"
               onPress={() => navigation.navigate('DMSSetup', { accountId, mode: 'reconfigure' })}
               style={styles.saveButton}
             />

@@ -5,7 +5,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { IconBadge } from '../../components/IconBadge';
-import { appAlert } from '../../components/AppAlert';
 import { VaultMarkIcon } from '../../components/icons';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { useOnboarding } from './OnboardingContext';
@@ -66,7 +65,7 @@ export function WelcomeScreen({ navigation }: Props) {
         <Pressable
           style={styles.recoverLink}
           accessibilityRole="button"
-          onPress={() => appAlert('กู้คืนด้วย 12 คำ', 'ฟีเจอร์นี้จะพร้อมใช้งานเร็วๆ นี้')}
+          onPress={() => navigation.navigate('Recover')}
         >
           <Text style={styles.recoverLinkText}>กู้คืนด้วย 12 คำ</Text>
         </Pressable>

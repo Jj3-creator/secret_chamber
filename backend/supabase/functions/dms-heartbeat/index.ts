@@ -4,6 +4,18 @@
 // the Dead Man's Switch. Guardians become eligible to request their share
 // only once dms_heartbeat_at + dms_threshold_hours has elapsed — enforced
 // against the SERVER's clock in dms-request-share, not the caller's claim.
+//
+// Feedback: "การเช็คอิน ... ต้องทำและ activate ปุ่มทุกครั้งทุกคน ไม่ว่า
+// จะ set ผู้รับกุญแจสำรองหรือไม่ เพราะมีผลต่อ non-entry 365 วันแล้วห้อง
+// จะต้องลบตัวเองไป" — check-in must always bump last_active_at (the
+// field the 1-year auto-delete cleanup job actually checks — see
+// cleanup-inactive-accounts), REGARDLESS of whether DMS/guardians were
+// ever configured. Previously this only ran a conditional UPDATE that
+// matched zero rows (and touched nothing) whenever dms_threshold_hours
+// was null OR the account row didn't exist yet — meaning a room that
+// never set up guardians could check in forever and still silently
+// accumulate towards deletion. Now an unconditional UPSERT, so a brand
+// new/no-DMS room's very first check-in still creates/refreshes the row.
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -31,22 +43,20 @@ serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const nowIso = new Date().toISOString();
 
+  // Upsert (not a conditional UPDATE) so this always bumps last_active_at
+  // — including a brand-new account's very first check-in, and one that
+  // never configured DMS at all. dms_heartbeat_at is written unconditionally
+  // too; it's simply unused by dms-request-share until dms_threshold_hours
+  // is also set (by dms-setup), so writing it early is harmless.
   const { data, error } = await supabase
     .from('accounts')
-    .update({ dms_heartbeat_at: nowIso, last_active_at: nowIso })
-    .eq('account_id', accountId)
-    .not('dms_threshold_hours', 'is', null)
+    .upsert({ account_id: accountId, last_active_at: nowIso, dms_heartbeat_at: nowIso }, { onConflict: 'account_id' })
     .select('dms_heartbeat_at, dms_threshold_hours')
     .maybeSingle();
 
   if (error) {
-    console.error('heartbeat update failed', error.message);
+    console.error('heartbeat upsert failed', error.message);
     return json({ error: 'internal_error' }, 500);
-  }
-  if (!data) {
-    // Either the account doesn't exist, or it exists but never ran
-    // dms-setup (dms_threshold_hours is null) — nothing to heartbeat.
-    return json({ error: 'dms_not_configured' }, 400);
   }
 
   const { error: logError } = await supabase.from('activity_log').insert({ account_id: accountId, event_type: 'heartbeat' });
@@ -54,7 +64,7 @@ serve(async (req: Request) => {
 
   return json({
     account_id: accountId,
-    dms_heartbeat_at: data.dms_heartbeat_at,
-    dms_threshold_hours: data.dms_threshold_hours,
+    dms_heartbeat_at: data?.dms_heartbeat_at ?? nowIso,
+    dms_threshold_hours: data?.dms_threshold_hours ?? null,
   });
 });

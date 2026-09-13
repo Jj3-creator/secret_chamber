@@ -33,10 +33,11 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { ThemedBackground } from '../../components/ThemedBackground';
 import { IconBadge } from '../../components/IconBadge';
 import { Checkbox } from '../../components/Checkbox';
+import { RadioOption } from '../../components/RadioOption';
 import { KeyIcon } from '../../components/icons';
 import { appAlert } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
-import { generateRandomToken, sha256Hex, deriveMasterKey } from '../../services/crypto';
+import { generateRandomToken, sha256Hex, deriveKeyDeterministic } from '../../services/crypto';
 import { createRecoveryShares, wrapVaultKey } from '../../services/vault';
 import { setupDms, getAccountStatus } from '../../services/backend';
 import { saveGuardianContacts, loadGuardianContacts } from '../../services/guardianContacts';
@@ -113,6 +114,16 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   const [notifyConsent, setNotifyConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [revealed, setRevealed] = useState<RevealedGuardian[] | null>(null);
+  // Feedback: "ช่องผู้ถือกุญแจสำรอง ... ควรมี 2 ขั้นตอน [] ต้องการแก้ไข
+  // [] คงเดิมไม่แก้ไข ถ้า tick ต้องการแก้ไข ค่อยโผล่ template" — reconfigure
+  // mode only; defaults to 'keep' (the safer default — nothing changes
+  // unless explicitly opted into). Fresh onboarding has no "existing" data
+  // to gate behind this, so it always shows the form directly.
+  const [guardianEditChoice, setGuardianEditChoice] = useState<'edit' | 'keep'>('keep');
+  // The guardian names as they were BEFORE any edits — kept separately
+  // from `guardians` (which IS what gets submitted) purely so the
+  // "(เดิม: xxx) แก้เป็น: ___" template below has something to show.
+  const [originalGuardians, setOriginalGuardians] = useState<Guardian[]>([emptyGuardian(), emptyGuardian(), emptyGuardian()]);
 
   // Reconfigure mode only: load the existing setup so the owner adjusts
   // it rather than starting from a blank form. Recovery tokens themselves
@@ -132,6 +143,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           slots[i] = { name: g.name, email: g.email ?? '', lineId: g.lineId ?? '' };
         });
         setGuardians(slots);
+        setOriginalGuardians(slots);
         setVerifyMode(record.threshold >= record.guardians.length && record.guardians.length > 1 ? 'all' : 'any');
       }
       setPrefilled(true);
@@ -200,7 +212,12 @@ export function DMSSetupScreen({ navigation, route }: Props) {
     setSubmitting(true);
     try {
       const tokens = await Promise.all(names.map(() => generateRandomToken()));
-      const guardianKeys = await Promise.all(tokens.map((t) => deriveMasterKey(t)));
+      // Deterministic derivation (fixed salt), not deriveMasterKey's own
+      // default random salt — a guardian later re-supplying this exact
+      // token must re-derive the SAME key to unwrap their share. A random
+      // salt with nowhere persisted to store it would make that
+      // impossible. See crypto.ts's DETERMINISTIC_SALT_HEX.
+      const guardianKeys = await Promise.all(tokens.map((t) => deriveKeyDeterministic(t)));
 
       // threshold === 1 (either only 1 guardian exists, or "any one
       // guardian" was chosen) means there's nothing to "split" — Shamir's
@@ -308,7 +325,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           <KeyIcon size={28} color={colors.textPrimary} />
         </IconBadge>
         <Text style={styles.title}>
-          {isReconfigure ? 'แก้ไขผู้ถือกุญแจสำรอง / รอบเช็คอิน' : 'กุญแจไขความลับสำหรับทายาท (ไม่บังคับ)'}
+          {isReconfigure ? 'แก้ไขผู้ถือกุญแจสำรอง / กรอบเวลาเปิดสิทธิ์' : 'กุญแจไขความลับสำหรับทายาท (ไม่บังคับ)'}
         </Text>
         {isReconfigure && !prefilled && <Text style={styles.subtitle}>กำลังโหลดค่าปัจจุบัน…</Text>}
         {isReconfigure && (
@@ -334,7 +351,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
         {enabled && (
           <>
-            <Text style={styles.fieldLabel}>รอบเช็คอิน</Text>
+            <Text style={styles.fieldLabel}>กรอบเวลาแจ้งผู้ถือกุญแจสำรอง/กรอบเวลาที่ผู้ถือรหัสสำรองใช้สิทธิ์เปิดห้องได้</Text>
             <View style={styles.periodRow}>
               {PERIOD_OPTIONS.map((opt) => {
                 const active = periodHours === opt.hours;
@@ -376,38 +393,66 @@ export function DMSSetupScreen({ navigation, route }: Props) {
               ช่องที่ 1 จำเป็นต้องใส่ — ช่องที่ 2 และ 3 ไม่บังคับ เว้นว่างไว้ได้ถ้าไม่ต้องการ เก็บอีเมล/LINE ไว้ในเครื่องนี้เท่านั้น
               (ไม่ส่งขึ้น server) — ใช้อีเมลหรือ LINE แทนเบอร์โทร เพราะเชื่อมต่อแจ้งเตือนได้โดยไม่มีค่าใช้จ่ายเมื่อฟีเจอร์นี้เปิดใช้งานในอนาคต
             </Text>
-            {guardians.map((guardian, i) => (
-              <View key={i} style={styles.guardianCard}>
-                <Text style={styles.guardianCardTitle}>
-                  ผู้รับรหัสลำดับที่ {i + 1} {i === 0 ? '(จำเป็น)' : '(ไม่บังคับ)'}
-                </Text>
-                <TextInput
-                  value={guardian.name}
-                  onChangeText={(v) => updateGuardian(i, 'name', v)}
-                  placeholder={`ชื่อผู้รับรหัสลำดับที่ ${i + 1}`}
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.input}
+
+            {isReconfigure && (
+              <>
+                <RadioOption
+                  selected={guardianEditChoice === 'keep'}
+                  onSelect={() => setGuardianEditChoice('keep')}
+                  label="คงเดิมไม่แก้ไข"
                 />
-                <View style={styles.guardianRow}>
-                  <TextInput
-                    value={guardian.email}
-                    onChangeText={(v) => updateGuardian(i, 'email', v)}
-                    placeholder="อีเมล (ไม่บังคับ)"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    style={[styles.input, styles.inputHalf]}
-                  />
-                  <TextInput
-                    value={guardian.lineId}
-                    onChangeText={(v) => updateGuardian(i, 'lineId', v)}
-                    placeholder="LINE ID (ไม่บังคับ)"
-                    placeholderTextColor={colors.textMuted}
-                    style={[styles.input, styles.inputHalf]}
-                  />
-                </View>
+                <RadioOption
+                  selected={guardianEditChoice === 'edit'}
+                  onSelect={() => setGuardianEditChoice('edit')}
+                  label="ต้องการแก้ไข"
+                />
+              </>
+            )}
+
+            {isReconfigure && guardianEditChoice === 'keep' ? (
+              <View style={styles.noteBox}>
+                <Text style={styles.noteText}>
+                  {activeGuardians.length > 0
+                    ? `ผู้ถือกุญแจสำรองปัจจุบัน: ${activeGuardians.map((g) => g.name).join(', ')}`
+                    : 'ยังไม่มีผู้ถือกุญแจสำรอง'}
+                  {' — จะบันทึกด้วยรายชื่อเดิมนี้ (รหัสกุญแจสำรองจะถูกสร้างใหม่ทั้งหมดตามปกติ)'}
+                </Text>
               </View>
-            ))}
+            ) : (
+              guardians.map((guardian, i) => (
+                <View key={i} style={styles.guardianCard}>
+                  <Text style={styles.guardianCardTitle}>
+                    ผู้รับรหัสลำดับที่ {i + 1} {i === 0 ? '(จำเป็น)' : '(ไม่บังคับ)'}
+                    {isReconfigure ? ` (เดิม: ${originalGuardians[i].name || 'ว่าง'})` : ''}
+                  </Text>
+                  <TextInput
+                    value={guardian.name}
+                    onChangeText={(v) => updateGuardian(i, 'name', v)}
+                    placeholder={isReconfigure ? `แก้เป็น… (เว้นว่าง = ไม่เปลี่ยน)` : `ชื่อผู้รับรหัสลำดับที่ ${i + 1}`}
+                    placeholderTextColor={colors.textMuted}
+                    style={styles.input}
+                  />
+                  <View style={styles.guardianRow}>
+                    <TextInput
+                      value={guardian.email}
+                      onChangeText={(v) => updateGuardian(i, 'email', v)}
+                      placeholder="อีเมล (ไม่บังคับ)"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      style={[styles.input, styles.inputHalf]}
+                    />
+                    <TextInput
+                      value={guardian.lineId}
+                      onChangeText={(v) => updateGuardian(i, 'lineId', v)}
+                      placeholder="LINE ID (ไม่บังคับ)"
+                      placeholderTextColor={colors.textMuted}
+                      style={[styles.input, styles.inputHalf]}
+                    />
+                  </View>
+                </View>
+              ))
+            )}
 
             {activeGuardians.length >= 2 && (
               <>

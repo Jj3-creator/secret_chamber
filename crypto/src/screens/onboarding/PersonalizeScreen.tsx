@@ -13,6 +13,8 @@ import { ROOM_THEMES } from '../../theme/roomThemes';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { saveRoomProfile } from '../../services/localProfile';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
+import { useOnboarding } from './OnboardingContext';
+import { useVaultSession } from '../vault/VaultSessionContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Personalize'>;
 
@@ -21,6 +23,8 @@ export function PersonalizeScreen({ navigation, route }: Props) {
   const [nickname, setNickname] = useState('');
   const [avatarId, setAvatarId] = useState(AVATAR_OPTIONS[0].id);
   const { themeId, accentColor, backgroundColor, setThemeId } = useRoomTheme();
+  const { isRecovering, masterKeyHex, clear } = useOnboarding();
+  const { setMasterKeyHex: setSessionMasterKeyHex } = useVaultSession();
   const [saving, setSaving] = useState(false);
 
   const displayName = nickname.trim() || 'คุณ';
@@ -29,7 +33,21 @@ export function PersonalizeScreen({ navigation, route }: Props) {
     setSaving(true);
     try {
       await saveRoomProfile(accountId, { nickname: nickname.trim(), avatarId, themeId });
-      navigation.navigate('DMSSetup', { accountId, kdf });
+      // Recovering an existing room: DMSSetupScreen's fresh-onboarding
+      // form would silently REPLACE any already-configured guardians with
+      // blank slots if submitted — skip straight to Done instead.
+      // Reconfiguring guardians afterwards goes through Settings'
+      // "reconfigure" mode, which correctly prefills the existing setup.
+      // Since DMSSetupScreen.finish() is what normally carries
+      // masterKeyHex into VaultSessionContext (and clears
+      // OnboardingContext), do both of those here instead when skipping it.
+      if (isRecovering) {
+        if (masterKeyHex) setSessionMasterKeyHex(masterKeyHex);
+        clear();
+        navigation.navigate('Done', { accountId, kdf });
+      } else {
+        navigation.navigate('DMSSetup', { accountId, kdf });
+      }
     } finally {
       setSaving(false);
     }

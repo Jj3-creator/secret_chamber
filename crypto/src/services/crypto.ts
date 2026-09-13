@@ -185,6 +185,45 @@ async function tryArgon2id(
  * (e.g. after loading the persisted, non-secret salt from SecureStore).
  * Omit it to generate a fresh random salt for first-time key creation.
  */
+/**
+ * A fixed, PUBLIC (non-secret) salt for deriving a key from a high-entropy
+ * secret the caller will re-supply VERBATIM later with no salt storage of
+ * its own — the 12-word passphrase itself (room creation/recovery), and a
+ * DMS guardian's recovery token (their own credential, held by them).
+ *
+ * This is deliberately NOT used for PIN derivation (see derivePinKey/
+ * SetPinScreen), which correctly keeps a fresh random salt persisted
+ * alongside the wrapped blob — a PIN is low-entropy and genuinely needs
+ * salting to resist rainbow-table attacks. A 128-bit mnemonic or a
+ * 256-bit random token already has so much entropy that a shared, known
+ * salt doesn't meaningfully weaken it — the same reasoning BIP-39 itself
+ * uses a fixed, publicly-documented salt formula ("mnemonic" + passphrase)
+ * rather than a random per-user one.
+ *
+ * Without this, `deriveMasterKey(passphrase)` (no existingSaltHex) picks a
+ * fresh random salt every call — meaning the SAME 12 words produce a
+ * DIFFERENT key each time, with nowhere the random salt was ever
+ * persisted to re-derive it later. That silently made "recover with your
+ * 12 words" and "guardian redeems their token" both impossible even with
+ * the exact correct input — caught via live testing of RecoverScreen.tsx.
+ */
+const DETERMINISTIC_SALT_HEX = bytesToHex(sha256(utf8ToBytes('secret-chamber:deterministic-kdf-salt:v1'))).slice(
+  0,
+  SALT_BYTES * 2
+);
+
+/**
+ * Derives a key from a secret the caller already has in full and will
+ * supply again verbatim later (a 12-word passphrase, or a DMS guardian's
+ * recovery token) — using the fixed DETERMINISTIC_SALT_HEX so the same
+ * input always reproduces the same key, with nothing extra to persist.
+ * See DETERMINISTIC_SALT_HEX's own comment for why a shared salt is fine
+ * here specifically (and wrong for low-entropy PINs).
+ */
+export async function deriveKeyDeterministic(secret: string): Promise<MasterKeyResult> {
+  return deriveMasterKey(secret, DETERMINISTIC_SALT_HEX);
+}
+
 export async function deriveMasterKey(
   passphrase: string,
   existingSaltHex?: string

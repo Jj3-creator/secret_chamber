@@ -1,6 +1,7 @@
 import {
   generatePassphrase,
   deriveMasterKey,
+  deriveKeyDeterministic,
   deriveAccountId,
   encryptData,
   decryptData,
@@ -70,6 +71,33 @@ describe('deriveAccountId', () => {
   it('never equals the master key itself (one-way, not passed through)', async () => {
     const { masterKeyHex } = await deriveMasterKey('one way hash test phrase');
     expect(deriveAccountId(masterKeyHex)).not.toBe(masterKeyHex);
+  });
+});
+
+describe('deriveKeyDeterministic', () => {
+  // This is the whole point of "recover your room with your 12 words" —
+  // caught a real bug via live testing where deriveMasterKey's own
+  // default random salt (correct for PIN derivation, wrong here) made
+  // the exact same passphrase derive a DIFFERENT key every time, with no
+  // salt ever persisted to reproduce it. See crypto.ts's
+  // DETERMINISTIC_SALT_HEX for the full reasoning.
+  it('derives the exact same key from the exact same input, every time', async () => {
+    const a = await deriveKeyDeterministic('same twelve word phrase repeated for this test only');
+    const b = await deriveKeyDeterministic('same twelve word phrase repeated for this test only');
+    expect(a.masterKeyHex).toBe(b.masterKeyHex);
+    expect(deriveAccountId(a.masterKeyHex)).toBe(deriveAccountId(b.masterKeyHex));
+  });
+
+  it('derives different keys for different input', async () => {
+    const a = await deriveKeyDeterministic('phrase one for deterministic test');
+    const b = await deriveKeyDeterministic('phrase two for deterministic test');
+    expect(a.masterKeyHex).not.toBe(b.masterKeyHex);
+  });
+
+  it('differs from a random-salt deriveMasterKey call on the same input (proves it is not just reusing the random path)', async () => {
+    const deterministic = await deriveKeyDeterministic('random vs deterministic comparison phrase');
+    const random = await deriveMasterKey('random vs deterministic comparison phrase');
+    expect(deterministic.masterKeyHex).not.toBe(random.masterKeyHex);
   });
 });
 

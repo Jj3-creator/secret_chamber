@@ -4,6 +4,7 @@ import { colors } from '../theme/tokens';
 import { OnboardingProvider } from '../screens/onboarding/OnboardingContext';
 import { WelcomeScreen } from '../screens/onboarding/WelcomeScreen';
 import { WarningScreen } from '../screens/onboarding/WarningScreen';
+import { RecoverScreen } from '../screens/onboarding/RecoverScreen';
 import { PassphraseScreen } from '../screens/onboarding/PassphraseScreen';
 import { ConfirmScreen } from '../screens/onboarding/ConfirmScreen';
 import { SetPinScreen } from '../screens/onboarding/SetPinScreen';
@@ -19,6 +20,8 @@ import { SettingsScreen } from '../screens/vault/SettingsScreen';
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
+  /** Real "กู้คืนด้วย 12 คำ" flow — reachable from Welcome and Unlock's forgot-PIN link. See RecoverScreen.tsx. */
+  Recover: undefined;
   Warning: undefined;
   Passphrase: undefined;
   Confirm: undefined;
@@ -68,6 +71,7 @@ export function OnboardingNavigator({ initialRouteName }: Props) {
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       >
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
+        <Stack.Screen name="Recover" component={RecoverScreen} />
         <Stack.Screen name="Unlock" component={UnlockScreen} />
         <Stack.Screen name="Warning" component={WarningScreen} />
         <Stack.Screen name="Passphrase" component={PassphraseScreen} />
