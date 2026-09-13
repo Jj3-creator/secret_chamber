@@ -325,7 +325,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           <KeyIcon size={28} color={colors.textPrimary} />
         </IconBadge>
         <Text style={styles.title}>
-          {isReconfigure ? 'แก้ไขผู้ถือกุญแจสำรอง / กรอบเวลาเปิดสิทธิ์' : 'กุญแจไขความลับสำหรับทายาท (ไม่บังคับ)'}
+          {isReconfigure ? 'แก้ไขผู้ถือกุญแจสำรอง / กรอบเวลาเปิดสิทธิ์' : 'กำหนดผู้ถือรหัสกุญแจสำรอง (ไม่บังคับ)'}
         </Text>
         {isReconfigure && !prefilled && <Text style={styles.subtitle}>กำลังโหลดค่าปัจจุบัน…</Text>}
         {isReconfigure && (
@@ -351,7 +351,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
         {enabled && (
           <>
-            <Text style={styles.fieldLabel}>กรอบเวลาแจ้งผู้ถือกุญแจสำรอง/กรอบเวลาที่ผู้ถือรหัสสำรองใช้สิทธิ์เปิดห้องได้</Text>
+            <Text style={styles.fieldLabel}>รหัสกุญแจสำรองอนุมัติอัตโนมัติหลังไม่ log in เกิน... วัน</Text>
             <View style={styles.periodRow}>
               {PERIOD_OPTIONS.map((opt) => {
                 const active = periodHours === opt.hours;
@@ -369,8 +369,8 @@ export function DMSSetupScreen({ navigation, route }: Props) {
               })}
             </View>
             <Text style={styles.periodExplainer}>
-              ความหมาย: ถ้าคุณไม่กดปุ่ม "เช็คอิน" ในห้องลับเลยเกิน{' '}
-              {PERIOD_OPTIONS.find((o) => o.hours === periodHours)?.label ?? ''} นับจากครั้งล่าสุด ระบบจะเริ่มให้ผู้ถือกุญแจสำรองกู้คืนกุญแจได้
+              ความหมาย: ถ้าคุณไม่ log in ห้องลับนี้เกิน{' '}
+              {PERIOD_OPTIONS.find((o) => o.hours === periodHours)?.label ?? ''} นับจากครั้งล่าสุด ระบบจะอนุญาตให้ผู้ถือกุญแจสำรอง log in เข้าห้องลับของคุณได้
             </Text>
 
             <View style={[styles.toggleRow, { marginBottom: spacing.xs }]}>
