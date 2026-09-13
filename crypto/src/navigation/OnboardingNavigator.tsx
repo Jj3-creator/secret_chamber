@@ -37,7 +37,8 @@ export type OnboardingStackParamList = {
   /** Nickname/avatar/theme, stored locally only — not part of the original design, added per feedback. */
   Personalize: { accountId: string; kdf: string };
   /** Optional — check-in period + guardians, real crypto + real backend calls. See DMSSetupScreen.tsx. */
-  DMSSetup: { accountId: string; kdf: string };
+  /** mode: 'reconfigure' when reached from SettingsScreen (post-onboarding, room already unlocked) instead of fresh onboarding — kdf is unused in that mode (never navigates to Done), so it's optional there. */
+  DMSSetup: { accountId: string; kdf?: string; mode?: 'reconfigure' };
   /** Landing screen right after onboarding completes (after the optional SetPin + DMSSetup steps). */
   Done: { accountId: string; kdf: string };
   /** Screen 3.1 — Vault Dashboard home. See VaultHomeScreen.tsx for what's real vs. mock. */

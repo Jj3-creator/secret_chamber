@@ -136,6 +136,18 @@ export function VaultHomeScreen({ route, navigation }: Props) {
   );
 
   const handleCheckIn = async () => {
+    // Feedback: reported repeatedly as "ปุ่มเช็คอินไม่ activate" — the
+    // button used to be hard-`disabled` whenever !dmsConfigured, which
+    // silently eats every tap with zero feedback (a disabled Pressable
+    // never fires onPress at all). A button that does nothing when
+    // tapped reads as "broken", not "needs setup first". Now the button
+    // is never hard-disabled for that reason — tapping it always at
+    // least explains why, same as the already-existing "DMS not
+    // configured" branch below for the network-confirmed case.
+    if (!dmsConfigured) {
+      appAlert('ยังเช็คอินไม่ได้', 'ต้องตั้งค่ากุญแจไขความลับสำหรับทายาทก่อน ถึงจะเปิดใช้ปุ่มนี้ได้');
+      return;
+    }
     setCheckingIn(true);
     try {
       const result = await sendHeartbeat(accountId);
@@ -257,7 +269,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
               <PrimaryButton
                 variant="secondary"
                 label={checkingIn ? 'กำลังเช็คอิน…' : 'เช็คอิน'}
-                disabled={checkingIn || !dmsConfigured}
+                disabled={checkingIn}
                 onPress={handleCheckIn}
                 style={styles.checkinButton}
               />
@@ -279,12 +291,12 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                   accessibilityRole="button"
                   onPress={() => navigation.navigate('CategoryDetail', { accountId, categoryId: cat.id })}
                 >
-                  <SafeGraphic width={100} height={112} color={themeColor} />
+                  <View style={styles.tileArt}><SafeGraphic width={100} height={112} color={themeColor} /></View>
                   <Text style={[styles.tileNumber, { color: themeColor }]}>{i + 1}</Text>
-                  <IconBadge size={36} tint={themeColor} style={styles.tileIcon}>
-                    <Icon size={18} color={colors.textPrimary} />
+                  <IconBadge size={30} tint={themeColor} style={styles.tileIcon}>
+                    <Icon size={15} color={colors.textPrimary} />
                   </IconBadge>
-                  <Text style={[styles.tileName, { fontSize: scaled(13) }]} numberOfLines={2}>
+                  <Text style={[styles.tileName, { fontSize: scaled(11) }]} numberOfLines={2}>
                     {cat.nameTh}
                   </Text>
                   {/* Feedback: show who's authorized, but only when a
@@ -315,18 +327,18 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                 >
                   {customName ? (
                     <>
-                      <SafeGraphic width={100} height={112} color={themeColor} />
+                      <View style={styles.tileArt}><SafeGraphic width={100} height={112} color={themeColor} /></View>
                       <Text style={[styles.tileNumber, { color: themeColor }]}>{safeNumber}</Text>
-                      <IconBadge size={36} tint={themeColor} style={styles.tileIcon}>
-                        <DocumentIcon size={18} color={colors.textPrimary} />
+                      <IconBadge size={30} tint={themeColor} style={styles.tileIcon}>
+                        <DocumentIcon size={15} color={colors.textPrimary} />
                       </IconBadge>
-                      <Text style={[styles.tileName, { fontSize: scaled(13) }]} numberOfLines={2}>
+                      <Text style={[styles.tileName, { fontSize: scaled(11) }]} numberOfLines={2}>
                         {customName}
                       </Text>
                     </>
                   ) : (
                     <>
-                      <SafeGraphic width={100} height={112} color={colors.textMuted} opacity={0.3} />
+                      <View style={styles.tileArt}><SafeGraphic width={100} height={112} color={colors.textMuted} opacity={0.3} /></View>
                       <Text style={styles.tileEmptyNumber}>{safeNumber}</Text>
                       <PlusIcon size={16} color={colors.textMuted} />
                       <Text style={styles.tileEmptyLabel}>ว่าง — แตะเพื่อตั้งชื่อ</Text>
@@ -416,7 +428,12 @@ const styles = StyleSheet.create({
   },
   tile: {
     width: '31%',
-    aspectRatio: 0.92,
+    // Feedback: safe #6's 2-line name ("ความต้องการ ก่อนตาย") was getting
+    // its second line clipped on real (narrower/shorter) phones — this
+    // tile was just too short for icon + 2 lines of text to fit. Taller
+    // aspect ratio (was 0.92) gives real breathing room, on top of the
+    // smaller icon/font below.
+    aspectRatio: 0.78,
     borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -425,16 +442,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xs,
     marginBottom: spacing.sm,
-    overflow: 'hidden',
+    // Deliberately NOT overflow:'hidden' on the tile itself any more — a
+    // slight overflow should still be visible (better than silently
+    // clipped) now that the SafeGraphic background art below is the only
+    // thing that actually needs corner-clipping.
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 2,
   },
+  tileArt: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 14, overflow: 'hidden' },
   tileNumber: { ...typography.label, fontSize: 13, position: 'absolute', top: 8, left: 10 },
   tileIcon: { marginBottom: spacing.xs },
-  tileName: { ...typography.body, fontSize: 13, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  tileName: { ...typography.body, fontSize: 11, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
   tileAuthName: { ...typography.body, fontSize: 10, color: colors.textMuted, textAlign: 'center', marginTop: 2 },
   // Unnamed custom slots — a big standalone number instead of a text
   // row, so it's obviously a placeholder waiting to be named, not a

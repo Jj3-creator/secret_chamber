@@ -202,6 +202,33 @@ export function DashboardScreen({ navigation, route }: Props) {
             </View>
           </View>
 
+          {/* Feedback: "แดชบอรด์ ตาราง activity log หายไป" — it never
+              actually left the code, but the 3 new date/status cards
+              below pushed it far enough down that it read as gone on a
+              real phone screen. Moved back up right after storage (where
+              it always was) so it's visible without much scrolling; the
+              newer status cards now come after it instead of before. */}
+          <Text style={styles.sectionLabel}>กิจกรรมล่าสุด</Text>
+          {activity && activity.length === 0 && <Text style={styles.emptyText}>ยังไม่มีกิจกรรม</Text>}
+          {activity?.map((entry, i) => {
+            const detail = describeEntry(entry);
+            return (
+              <View key={i} style={styles.activityRow}>
+                <IconBadge size={36} tint={accentColor}>
+                  <ChartIcon size={16} color={colors.textPrimary} />
+                </IconBadge>
+                <View style={styles.activityTextBlock}>
+                  <Text style={styles.activityLabel}>{EVENT_LABELS[entry.eventType]}</Text>
+                  <Text style={styles.activityTime}>
+                    {formatThaiDateTime(entry.createdAt)}
+                    {detail ? ` · ${detail}` : ''}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+
+          <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>สถานะห้อง</Text>
           <View style={styles.card}>
             <View style={styles.cardTitleRow}>
               <IconBadge size={32} tint={accentColor}>
@@ -237,30 +264,10 @@ export function DashboardScreen({ navigation, route }: Props) {
             </View>
             <Text style={styles.cardSubtext}>
               {roomStatus?.autoDeleteAt
-                ? `${formatThaiDate(roomStatus.autoDeleteAt)} — ถ้าคุณไม่เข้าใช้ห้องนี้เลยก่อนวันนี้ (นับจากใช้งานล่าสุด)`
+                ? `${formatThaiDate(roomStatus.autoDeleteAt)} — นับจากวันเช็คอิน/ใช้งานล่าสุด หากไม่เช็คอินหรือเข้าห้องเลยก่อนวันนี้`
                 : 'ยังไม่มีข้อมูลการใช้งาน'}
             </Text>
           </View>
-
-          <Text style={styles.sectionLabel}>กิจกรรมล่าสุด</Text>
-          {activity && activity.length === 0 && <Text style={styles.emptyText}>ยังไม่มีกิจกรรม</Text>}
-          {activity?.map((entry, i) => {
-            const detail = describeEntry(entry);
-            return (
-              <View key={i} style={styles.activityRow}>
-                <IconBadge size={36} tint={accentColor}>
-                  <ChartIcon size={16} color={colors.textPrimary} />
-                </IconBadge>
-                <View style={styles.activityTextBlock}>
-                  <Text style={styles.activityLabel}>{EVENT_LABELS[entry.eventType]}</Text>
-                  <Text style={styles.activityTime}>
-                    {formatThaiDateTime(entry.createdAt)}
-                    {detail ? ` · ${detail}` : ''}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
         </ScrollView>
       )}
     </View>

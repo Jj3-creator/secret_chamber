@@ -239,12 +239,17 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
               {isCustom ? (
                 // Feedback: safes 7-12 are user-defined topics — let the
                 // owner name (and rename) this one right here, instead of
-                // a placeholder alert.
+                // a placeholder alert. Also feedback: this box was getting
+                // confused for "who can access this safe" (a separate
+                // section further down, using tick/radio choices, not
+                // typing) — an explicit "ชื่อตู้เซฟนี้" label above the
+                // input makes clear it's just this safe's own name.
                 <>
+                  <Text style={styles.nameFieldLabel}>ชื่อตู้เซฟนี้ (ไม่ใช่ชื่อผู้มีสิทธิ์เข้าถึง)</Text>
                   <TextInput
                     value={customName}
                     onChangeText={setCustomName}
-                    placeholder="ตั้งชื่อตู้เซฟนี้ เช่น รหัสผ่านสำคัญ, สัญญาต่างๆ"
+                    placeholder="เช่น รหัสผ่านสำคัญ, สัญญาต่างๆ"
                     placeholderTextColor={colors.textMuted}
                     style={styles.nameInput}
                   />
@@ -339,7 +344,7 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
               </>
             )}
 
-            <Text style={[styles.sectionLabel, { fontSize: scaled(16) }]}>ผู้มีสิทธิ์เข้าถึงตู้เซฟนี้</Text>
+            <Text style={[styles.sectionLabel, { fontSize: scaled(16) }]}>ผู้มีสิทธิ์เข้าถึงตู้เซฟนี้ (เลือก 1 ข้อ)</Text>
             {loading ? null : !guardians || guardians.guardians.length === 0 ? (
               <View style={styles.noteBox}>
                 <Text style={styles.noteText}>
@@ -409,6 +414,7 @@ const styles = StyleSheet.create({
   categoryName: { ...typography.body, fontSize: 17, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
   categoryNameEn: { fontWeight: '400', color: colors.textMuted, fontSize: 14 },
   categoryDescription: { ...typography.body, fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  nameFieldLabel: { ...typography.label, fontSize: 13, color: colors.textMuted, textAlign: 'center', marginBottom: 2 },
   nameInput: {
     width: '100%',
     borderWidth: 1,

@@ -136,6 +136,15 @@ export function UnlockScreen({ navigation }: Props) {
             <Pressable onPress={handleForgotPin} accessibilityRole="button" style={styles.forgotLink}>
               <Text style={styles.forgotLinkText}>ลืม PIN?</Text>
             </Pressable>
+
+            {/* Feedback: "ทุกครั้งที่เข้าใหม่ ใช้ pin แล้ว รหัส 12 ตัวจะ
+                ให้ใช้เมื่อไหร่" — this used to only be explained if you
+                tapped "ลืม PIN?" first. Stated up front instead, so the
+                answer doesn't depend on noticing/tapping that link. */}
+            <Text style={styles.wordsUsageNote}>
+              รหัสกุญแจ 12 คำ ใช้ตอนกู้คืนห้องนี้บนเครื่องใหม่ หรือถ้าลืม PIN ของเครื่องนี้เท่านั้น —
+              ใช้ PIN ปลดล็อกทุกวันได้เลย ไม่ต้องพิมพ์ 12 คำซ้ำ
+            </Text>
           </ScrollView>
         </View>
       </SafeAreaView>
@@ -167,4 +176,5 @@ const styles = StyleSheet.create({
   error: { ...typography.body, fontSize: 16, color: colors.dangerText, marginBottom: spacing.md, textAlign: 'center' },
   forgotLink: { alignItems: 'center', paddingVertical: spacing.md },
   forgotLinkText: { ...typography.body, fontSize: 15, color: colors.textMuted },
+  wordsUsageNote: { ...typography.body, fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 18, marginTop: spacing.sm },
 });

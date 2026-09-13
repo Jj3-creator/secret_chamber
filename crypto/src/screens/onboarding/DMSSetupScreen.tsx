@@ -24,7 +24,7 @@
 // scrolling. Replaced with 3 always-rendered, clearly separate boxes
 // (slot 1 required, 2/3 marked optional) — no add/remove interaction, no
 // content that appears somewhere requiring a scroll to discover.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TextInput, Pressable, ScrollView, Switch } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Clipboard from 'expo-clipboard';
@@ -38,8 +38,8 @@ import { appAlert } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { generateRandomToken, sha256Hex, deriveMasterKey } from '../../services/crypto';
 import { createRecoveryShares, wrapVaultKey } from '../../services/vault';
-import { setupDms } from '../../services/backend';
-import { saveGuardianContacts } from '../../services/guardianContacts';
+import { setupDms, getAccountStatus } from '../../services/backend';
+import { saveGuardianContacts, loadGuardianContacts } from '../../services/guardianContacts';
 import { useOnboarding } from './OnboardingContext';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
 import { useVaultSession } from '../vault/VaultSessionContext';
@@ -76,12 +76,24 @@ interface RevealedGuardian {
 }
 
 export function DMSSetupScreen({ navigation, route }: Props) {
-  const { accountId, kdf } = route.params;
-  const { masterKeyHex, clear } = useOnboarding();
+  const { accountId, kdf, mode } = route.params;
+  // Feedback: "ปุ่ม setting ให้เพิ่มการตั้งผู้รับกุญแจสำรอง เงื่อนไขการ
+  // เปิดห้อง กำหนดดิวเดท ... ให้มาปรากฎ/เปลี่ยนค่าได้จากปุ่ม setting นี้" —
+  // reusing this exact screen (not building a second copy) for
+  // reconfiguring later from SettingsScreen, rather than only at
+  // first-time onboarding. The only real difference: the master key comes
+  // from VaultSessionContext (the room is already unlocked) instead of
+  // OnboardingContext, and finishing goes back to Settings instead of
+  // forward to Done.
+  const isReconfigure = mode === 'reconfigure';
+  const onboarding = useOnboarding();
+  const vaultSession = useVaultSession();
+  const masterKeyHex = isReconfigure ? vaultSession.masterKeyHex : onboarding.masterKeyHex;
   const { accentColor, backgroundColor } = useRoomTheme();
   const { setMasterKeyHex: setSessionMasterKeyHex } = useVaultSession();
 
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(isReconfigure);
+  const [prefilled, setPrefilled] = useState(!isReconfigure); // true once existing config (if any) has loaded, or immediately for fresh onboarding
   const [periodHours, setPeriodHours] = useState(PERIOD_OPTIONS[1].hours); // 14 days default
   // Preference only for now — there is no real SMS/LINE sending built (see
   // the noteBox below), so this doesn't change what the app actually does
@@ -102,6 +114,33 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [revealed, setRevealed] = useState<RevealedGuardian[] | null>(null);
 
+  // Reconfigure mode only: load the existing setup so the owner adjusts
+  // it rather than starting from a blank form. Recovery tokens themselves
+  // were never stored anywhere (shown once, by design — see the file
+  // header) so they can't be prefilled; saving always generates fresh
+  // ones for everyone, explained in the warning box below.
+  useEffect(() => {
+    if (!isReconfigure) return;
+    let cancelled = false;
+    (async () => {
+      const [record, status] = await Promise.all([loadGuardianContacts(accountId), getAccountStatus(accountId)]);
+      if (cancelled) return;
+      if (status.dmsThresholdHours != null) setPeriodHours(status.dmsThresholdHours);
+      if (record && record.guardians.length > 0) {
+        const slots = [emptyGuardian(), emptyGuardian(), emptyGuardian()];
+        record.guardians.slice(0, 3).forEach((g, i) => {
+          slots[i] = { name: g.name, email: g.email ?? '', lineId: g.lineId ?? '' };
+        });
+        setGuardians(slots);
+        setVerifyMode(record.threshold >= record.guardians.length && record.guardians.length > 1 ? 'all' : 'any');
+      }
+      setPrefilled(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isReconfigure, accountId]);
+
   const updateGuardian = (i: number, field: keyof Guardian, value: string) =>
     setGuardians((prev) => prev.map((g, idx) => (idx === i ? { ...g, [field]: value } : g)));
 
@@ -110,15 +149,32 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   const activeGuardians = guardians.filter((g) => g.name.trim().length > 0);
 
   const finish = () => {
+    if (isReconfigure) {
+      // Already reading the real key from VaultSessionContext (the room
+      // was already unlocked to get here) — nothing to carry over, just
+      // return to wherever Settings was.
+      navigation.goBack();
+      return;
+    }
     // Carry the real key into VaultSessionContext before OnboardingContext
     // drops it — so this brand-new room's very first VaultHome visit can
     // already encrypt/decrypt safe content, the same as a PIN-unlocked one.
     if (masterKeyHex) setSessionMasterKeyHex(masterKeyHex);
-    clear(); // done with OnboardingContext's own copy either way
-    navigation.navigate('Done', { accountId, kdf });
+    onboarding.clear(); // done with OnboardingContext's own copy either way
+    // kdf is always a real string on this (non-reconfigure) path — every
+    // route that leads here (Confirm -> SetPin -> Personalize) passes it
+    // through; it's only optional in the type because reconfigure mode
+    // (which never reaches this line) doesn't have one.
+    navigation.navigate('Done', { accountId, kdf: kdf! });
   };
 
-  const handleSkip = () => finish();
+  const handleSkip = () => {
+    if (isReconfigure) {
+      navigation.goBack();
+      return;
+    }
+    finish();
+  };
 
   const handleSetup = async () => {
     if (!masterKeyHex) {
@@ -251,7 +307,17 @@ export function DMSSetupScreen({ navigation, route }: Props) {
         <IconBadge size={56} tint={accentColor} style={styles.headerIcon}>
           <KeyIcon size={28} color={colors.textPrimary} />
         </IconBadge>
-        <Text style={styles.title}>กุญแจไขความลับสำหรับทายาท (ไม่บังคับ)</Text>
+        <Text style={styles.title}>
+          {isReconfigure ? 'แก้ไขผู้ถือกุญแจสำรอง / รอบเช็คอิน' : 'กุญแจไขความลับสำหรับทายาท (ไม่บังคับ)'}
+        </Text>
+        {isReconfigure && !prefilled && <Text style={styles.subtitle}>กำลังโหลดค่าปัจจุบัน…</Text>}
+        {isReconfigure && (
+          <View style={styles.warnBox}>
+            <Text style={styles.warnText}>
+              การบันทึกจะสร้างรหัสกุญแจสำรองชุดใหม่ทั้งหมด — รหัสเดิมที่เคยแจกไปแล้วจะใช้ไม่ได้อีก ต้องแจกรหัสใหม่ให้ทุกคนอีกครั้ง
+            </Text>
+          </View>
+        )}
         <Text style={styles.subtitle}>
           กุญแจนี้จะถูกส่งให้คนที่คุณระบุตัวตนไว้ (ทายาท/คนที่คุณไว้ใจ) ก็ต่อเมื่อห้องของคุณขาดการเช็คอินเกินเวลาที่คุณกำหนด
           {activeGuardians.length <= 1
@@ -394,13 +460,13 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
       <View style={styles.footer}>
         <Pressable onPress={handleSkip} accessibilityRole="button" style={styles.skipLink}>
-          <Text style={styles.skipLinkText}>ข้ามขั้นตอนนี้ไปก่อน</Text>
+          <Text style={styles.skipLinkText}>{isReconfigure ? 'ยกเลิก กลับไปหน้าตั้งค่า' : 'ข้ามขั้นตอนนี้ไปก่อน'}</Text>
         </Pressable>
         {enabled && (
           <PrimaryButton
-            label={submitting ? 'กำลังตั้งค่า…' : 'ตั้งค่าและสร้างรหัส'}
+            label={submitting ? 'กำลังตั้งค่า…' : isReconfigure ? 'บันทึกและสร้างรหัสใหม่' : 'ตั้งค่าและสร้างรหัส'}
             onPress={handleSetup}
-            disabled={submitting}
+            disabled={submitting || (isReconfigure && !prefilled)}
           />
         )}
       </View>
