@@ -1,7 +1,7 @@
 // Landing screen right after onboarding completes — reached after the
 // optional SetPin and DMSSetup steps.
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -13,8 +13,7 @@ import { loadDeviceLock } from '../../services/deviceLock';
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Done'>;
 
 export function DoneScreen({ route, navigation }: Props) {
-  const { accountId, kdf } = route.params;
-  const [showTechDetails, setShowTechDetails] = useState(false);
+  const { accountId } = route.params;
   // Feedback: since the reassurance text now says "the system re-derives
   // 3 words as the key every time" it needs to also explain what the PIN
   // is for, right below it — but SetPinScreen has a skip option, so only
@@ -45,32 +44,12 @@ export function DoneScreen({ route, navigation }: Props) {
         screen's exact combination rather than a change applied everywhere. */}
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-      {/* Feedback: expanding "รายละเอียดทางเทคนิค" adds real height — on a
-          short screen with no scroll, that content (or even just the base
-          text) could overflow past the button below with no way to reach
-          it. Same ScrollView-content + fixed-footer-button fix as
-          PassphraseScreen/WelcomeScreen. */}
       <ScrollView style={styles.scrollArea} contentContainerStyle={styles.textBlock} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>สร้างห้องลับของคุณสำเร็จแล้ว</Text>
         <Text style={styles.reassurance}>
           เก็บรหัสกุญแจ 12 คำไว้ให้ดี ระบบจะสุ่ม 3 คำเป็นกุญแจในการเข้าห้องทุกครั้ง
           {hasPin && ' และจำ PIN เพื่อปลดล็อกในขณะที่เข้าๆ ออกๆ ห้องช่วงสั้นๆ'}
         </Text>
-
-        <Pressable onPress={() => setShowTechDetails((v) => !v)} accessibilityRole="button">
-          <Text style={[styles.techToggle, { color: accentColor }]}>
-            {showTechDetails ? 'ซ่อนรายละเอียดทางเทคนิค' : 'ดูรายละเอียดทางเทคนิค'}
-          </Text>
-        </Pressable>
-        {showTechDetails && (
-          <View style={styles.techBox}>
-            <Text style={styles.techLabel}>รหัสห้อง (คำนวณจาก 12 คำ — ไม่ต้องจดแยก):</Text>
-            <Text style={styles.techValue} numberOfLines={2}>
-              {accountId}
-            </Text>
-            <Text style={styles.techLabel}>วิธีเข้ารหัส: {kdf}</Text>
-          </View>
-        )}
       </ScrollView>
       <PrimaryButton
         label="เข้าห้องลับของฉัน (My Secret Chamber)"
@@ -96,15 +75,4 @@ const styles = StyleSheet.create({
   confirmButton: { marginTop: spacing.sm },
   title: { ...typography.title, color: colors.textPrimary, marginBottom: spacing.md },
   reassurance: { ...typography.body, fontSize: 16, color: colors.textSecondary, lineHeight: 21, marginBottom: spacing.xl },
-  techToggle: { ...typography.body, fontSize: 15, color: colors.accentTeal, marginBottom: spacing.md },
-  techBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  techLabel: { ...typography.body, fontSize: 16, color: colors.textMuted, marginBottom: 4 },
-  techValue: { ...typography.mono, fontSize: 15, color: colors.textPrimary, marginBottom: spacing.sm },
 });

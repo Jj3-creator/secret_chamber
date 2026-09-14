@@ -61,7 +61,9 @@ const PERIOD_OPTIONS = [
 // (how many must agree) instead of it being hard-coded to "always 2" —
 // see the threshold picker below.
 const MIN_GUARDIANS = 1;
-const MAX_GUARDIANS = 3;
+// Feedback: reduced from 3 to 2 — a 2-name commitment is enough, and
+// keeps the guardian step quick to fill in.
+const MAX_GUARDIANS = 2;
 
 interface Guardian {
   name: string;
@@ -70,6 +72,7 @@ interface Guardian {
 }
 
 const emptyGuardian = (): Guardian => ({ name: '', email: '', lineId: '' });
+const makeGuardianSlots = (): Guardian[] => Array.from({ length: MAX_GUARDIANS }, emptyGuardian);
 
 interface RevealedGuardian {
   nickname: string;
@@ -93,9 +96,22 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   const { accentColor, backgroundColor } = useRoomTheme();
   const { setMasterKeyHex: setSessionMasterKeyHex } = useVaultSession();
 
-  const [enabled, setEnabled] = useState(isReconfigure);
+  // Feedback: "ให้มีปุ่ม trigger ว่าจะตั้งค่าไม๊" — fresh onboarding now
+  // asks explicitly before showing the whole form, instead of a Switch
+  // defaulted to off. Reconfigure mode skips this gate entirely (arriving
+  // here from Settings' "แก้ไข..." button already implies the intent),
+  // and always shows the form — same as before.
+  const [gateChoice, setGateChoice] = useState<'yes' | 'no' | null>(isReconfigure ? 'yes' : null);
+  const showForm = isReconfigure || gateChoice === 'yes';
   const [prefilled, setPrefilled] = useState(!isReconfigure); // true once existing config (if any) has loaded, or immediately for fresh onboarding
   const [periodHours, setPeriodHours] = useState(PERIOD_OPTIONS[1].hours); // 14 days default
+  // Feedback: "นอกจากปุ่ม ที่ fixed จำนวนวันแล้ว ควรมี อีก 1 กล่องให้ใส่
+  // จำนวนวันเอง (flexible)" — a free-text days box alongside the fixed
+  // chips. usingCustomPeriod just tracks which UI element is "selected"
+  // for the highlight; periodHours (the value actually submitted) is set
+  // by whichever one the owner last touched.
+  const [customDaysInput, setCustomDaysInput] = useState('');
+  const [usingCustomPeriod, setUsingCustomPeriod] = useState(false);
   // Preference only for now — there is no real SMS/LINE sending built (see
   // the noteBox below), so this doesn't change what the app actually does
   // yet. Kept as a separate, honestly-labeled toggle rather than silently
@@ -105,7 +121,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   // only one that must actually have a name; 2/3 are optional and simply
   // ignored (not sent, not counted) if left blank. See the file header
   // comment for why this replaced the old dynamic add/remove list.
-  const [guardians, setGuardians] = useState<Guardian[]>([emptyGuardian(), emptyGuardian(), emptyGuardian()]);
+  const [guardians, setGuardians] = useState<Guardian[]>(makeGuardianSlots());
   // Feedback: simplified from a "pick a number from 2..N" slider to a
   // plain binary choice — 'any' means one guardian's confirmation alone
   // is enough (OR); 'all' means every single guardian must confirm
@@ -123,7 +139,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
   // The guardian names as they were BEFORE any edits — kept separately
   // from `guardians` (which IS what gets submitted) purely so the
   // "(เดิม: xxx) แก้เป็น: ___" template below has something to show.
-  const [originalGuardians, setOriginalGuardians] = useState<Guardian[]>([emptyGuardian(), emptyGuardian(), emptyGuardian()]);
+  const [originalGuardians, setOriginalGuardians] = useState<Guardian[]>(makeGuardianSlots());
 
   // Reconfigure mode only: load the existing setup so the owner adjusts
   // it rather than starting from a blank form. Recovery tokens themselves
@@ -138,8 +154,8 @@ export function DMSSetupScreen({ navigation, route }: Props) {
       if (cancelled) return;
       if (status.dmsThresholdHours != null) setPeriodHours(status.dmsThresholdHours);
       if (record && record.guardians.length > 0) {
-        const slots = [emptyGuardian(), emptyGuardian(), emptyGuardian()];
-        record.guardians.slice(0, 3).forEach((g, i) => {
+        const slots = makeGuardianSlots();
+        record.guardians.slice(0, MAX_GUARDIANS).forEach((g, i) => {
           slots[i] = { name: g.name, email: g.email ?? '', lineId: g.lineId ?? '' };
         });
         setGuardians(slots);
@@ -300,7 +316,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           </Text>
           {revealed.map((g, i) => (
             <View key={g.nickname} style={styles.tokenCard}>
-              <Text style={styles.tokenNickname}>ผู้ถือกุญแจสำรอง: {g.nickname}</Text>
+              <Text style={styles.tokenNickname}>บุคคลที่คุณเชื่อถือ: {g.nickname}</Text>
               <Text style={styles.tokenLabel}>รหัสกุญแจสำรอง {i + 1}</Text>
               <Text style={styles.tokenValue} numberOfLines={2}>
                 {g.token}
@@ -325,7 +341,9 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           <KeyIcon size={28} color={colors.textPrimary} />
         </IconBadge>
         <Text style={styles.title}>
-          {isReconfigure ? 'แก้ไขผู้ถือกุญแจสำรอง / กรอบเวลาเปิดสิทธิ์' : 'กำหนดผู้ถือรหัสกุญแจสำรอง (ไม่บังคับ)'}
+          {isReconfigure
+            ? 'แก้ไขผู้ถือกุญแจสำรอง / กรอบเวลาเปิดสิทธิ์'
+            : 'ขั้นตอนตั้งค่าแจ้งเตือนอัตโนมัติเมื่อบัญชีนิ่ง (Auto-Notify on Inactivity)'}
         </Text>
         {isReconfigure && !prefilled && <Text style={styles.subtitle}>กำลังโหลดค่าปัจจุบัน…</Text>}
         {isReconfigure && (
@@ -335,42 +353,110 @@ export function DMSSetupScreen({ navigation, route }: Props) {
             </Text>
           </View>
         )}
-        <Text style={styles.subtitle}>
-          กุญแจนี้จะถูกส่งให้คนที่คุณระบุตัวตนไว้ (ทายาท/คนที่คุณไว้ใจ) ก็ต่อเมื่อห้องของคุณขาดการเช็คอินเกินเวลาที่คุณกำหนด
-          {activeGuardians.length <= 1
-            ? ' (มีผู้ถือกุญแจแค่คนเดียว คนนั้นจึงกู้คืนได้ทันทีด้วยรหัสของตัวเอง — ไม่มีใครช่วยตรวจสอบถ่วงดุล แนะนำให้เพิ่มเป็น 2-3 คนเพื่อความปลอดภัย)'
-            : verifyMode === 'all'
-              ? ` (ต้องได้รับความยินยอมจากทุกคนทั้ง ${activeGuardians.length} คน — ปลอดภัยที่สุด แต่ถ้าติดต่อใครคนหนึ่งไม่ได้ก็กู้คืนไม่ได้)`
-              : ` (แค่คนใดคนหนึ่งใน ${activeGuardians.length} คนก็กู้คืนได้ — สะดวกกว่า แต่ทายาทคนใดคนหนึ่งก็สามารถกู้คืนคนเดียวได้เช่นกัน)`}
-        </Text>
 
-        <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>เปิดใช้งาน</Text>
-          <Switch value={enabled} onValueChange={setEnabled} />
-        </View>
-
-        {enabled && (
+        {/* Feedback: "ให้มีปุ่ม trigger ว่าจะตั้งค่าไม๊" — fresh onboarding
+            only; reconfigure mode (accessed from Settings) skips straight
+            to the form below. */}
+        {!isReconfigure && (
           <>
-            <Text style={styles.fieldLabel}>รหัสกุญแจสำรองอนุมัติอัตโนมัติหลังไม่ log in เกิน... วัน</Text>
+            <Text style={styles.subtitle}>
+              ต้องการตั้งค่าแจ้งเตือนอัตโนมัติให้บุคคลที่คุณเชื่อถือ เมื่อคุณขาดการล็อกอินห้องนี้นานเกินไปหรือไม่?
+            </Text>
+            <View style={styles.periodRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: gateChoice === 'yes' }}
+                onPress={() => setGateChoice('yes')}
+                style={[styles.periodChip, gateChoice === 'yes' && { borderColor: accentColor, backgroundColor: `${accentColor}1F` }]}
+              >
+                <Text style={[styles.periodChipText, gateChoice === 'yes' && styles.periodChipTextActive]}>ตั้งค่า (Yes)</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: gateChoice === 'no' }}
+                onPress={() => setGateChoice('no')}
+                style={[styles.periodChip, gateChoice === 'no' && { borderColor: accentColor, backgroundColor: `${accentColor}1F` }]}
+              >
+                <Text style={[styles.periodChipText, gateChoice === 'no' && styles.periodChipTextActive]}>ไม่ตั้งค่า (No)</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+
+        {gateChoice === 'no' && (
+          <View style={styles.warnBox}>
+            <Text style={styles.warnText}>
+              หากคุณขาดการล็อกอินแอปนี้เกิน 1 ปี ความลับในห้องนี้จะหายไปพร้อมคุณตลอดไป
+            </Text>
+          </View>
+        )}
+
+        {showForm && (
+          <>
+            <Text style={styles.subtitle}>
+              กุญแจนี้จะถูกส่งให้บุคคลที่คุณเชื่อถือ ก็ต่อเมื่อห้องของคุณขาดการล็อกอินเกินเวลาที่คุณกำหนด
+              {activeGuardians.length <= 1
+                ? ' (หากกำหนดไว้เพียงคนเดียว คนนั้นจะกู้ห้องลับคืนได้โดยลำพัง — ไม่มีใครช่วยตรวจสอบถ่วงดุล แนะนำให้เพิ่มเป็น 2 คนเพื่อความปลอดภัย)'
+                : verifyMode === 'all'
+                  ? ` (ต้องได้รับความยินยอมจากทุกคนทั้ง ${activeGuardians.length} คน — ปลอดภัยที่สุด แต่ถ้าติดต่อใครคนหนึ่งไม่ได้ก็กู้คืนไม่ได้)`
+                  : ` (แค่คนใดคนหนึ่งใน ${activeGuardians.length} คนก็กู้คืนได้ — สะดวกกว่า แต่บุคคลนั้นก็สามารถกู้คืนคนเดียวได้เช่นกัน)`}
+            </Text>
+
+            <Text style={styles.popupTitle}>
+              ตั้งค่าระยะเวลาไร้เคลื่อนไหวที่ระบบจะแจ้งเตือนบุคคลที่คุณเชื่อถือโดยอัตโนมัติ
+            </Text>
+
+            <Text style={styles.fieldLabel}>กำหนดช่วงเวลาไร้เคลื่อนไหว (Inactive Period)</Text>
             <View style={styles.periodRow}>
               {PERIOD_OPTIONS.map((opt) => {
-                const active = periodHours === opt.hours;
+                const active = !usingCustomPeriod && periodHours === opt.hours;
                 return (
                   <Pressable
                     key={opt.hours}
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
-                    onPress={() => setPeriodHours(opt.hours)}
+                    onPress={() => {
+                      setPeriodHours(opt.hours);
+                      setUsingCustomPeriod(false);
+                    }}
                     style={[styles.periodChip, active && { borderColor: accentColor, backgroundColor: `${accentColor}1F` }]}
                   >
                     <Text style={[styles.periodChipText, active && styles.periodChipTextActive]}>{opt.label}</Text>
                   </Pressable>
                 );
               })}
+              <View
+                style={[
+                  styles.periodChip,
+                  styles.customPeriodChip,
+                  usingCustomPeriod && { borderColor: accentColor, backgroundColor: `${accentColor}1F` },
+                ]}
+              >
+                <TextInput
+                  value={customDaysInput}
+                  onChangeText={(v) => {
+                    const digits = v.replace(/[^0-9]/g, '');
+                    setCustomDaysInput(digits);
+                    const n = parseInt(digits, 10);
+                    if (!isNaN(n) && n > 0) {
+                      setPeriodHours(n * 24);
+                      setUsingCustomPeriod(true);
+                    } else {
+                      setUsingCustomPeriod(false);
+                    }
+                  }}
+                  placeholder="กำหนดเอง"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="number-pad"
+                  style={styles.customPeriodInput}
+                />
+                <Text style={styles.periodChipText}>วัน</Text>
+              </View>
             </View>
             <Text style={styles.periodExplainer}>
               ความหมาย: ถ้าคุณไม่ log in ห้องลับนี้เกิน{' '}
-              {PERIOD_OPTIONS.find((o) => o.hours === periodHours)?.label ?? ''} นับจากครั้งล่าสุด ระบบจะอนุญาตให้ผู้ถือกุญแจสำรอง log in เข้าห้องลับของคุณได้
+              {PERIOD_OPTIONS.find((o) => o.hours === periodHours)?.label ?? `${Math.round(periodHours / 24)} วัน`} นับจากครั้งล่าสุด
+              ระบบจะอนุญาตให้บุคคลที่คุณเชื่อถือ log in เข้าห้องลับของคุณได้
             </Text>
 
             <View style={[styles.toggleRow, { marginBottom: spacing.xs }]}>
@@ -383,14 +469,17 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
             <View style={styles.warnBox}>
               <Text style={styles.warnText}>
-                ปุ่ม "เช็คอิน" เดียวกันนี้ใช้นับเวลาสำหรับการลบห้องอัตโนมัติด้วย — ถ้าคุณไม่เช็คอินเลยเกิน 1 ปี ห้องนี้และไฟล์ทั้งหมดจะถูกลบถาวรโดยอัตโนมัติ
-                กู้คืนไม่ได้ ไม่ว่าจะตั้งค่าผู้ถือกุญแจสำรองไว้หรือไม่ก็ตาม
+                การล็อกอินเข้าห้องนี้ใช้นับเวลาสำหรับการลบห้องอัตโนมัติด้วย — ถ้าคุณไม่ล็อกอินเลยเกิน 1 ปี ห้องนี้และไฟล์ทั้งหมดจะถูกลบถาวรโดยอัตโนมัติ
+                กู้คืนไม่ได้ ไม่ว่าจะตั้งค่าบุคคลที่คุณเชื่อถือไว้หรือไม่ก็ตาม
               </Text>
             </View>
 
-            <Text style={styles.fieldLabel}>ผู้ถือกุญแจสำรอง ({MIN_GUARDIANS}-{MAX_GUARDIANS} คน)</Text>
+            <Text style={styles.fieldLabel}>บุคคลที่คุณเชื่อถือ ({MIN_GUARDIANS}-{MAX_GUARDIANS} คน)</Text>
             <Text style={styles.contactNote}>
-              ช่องที่ 1 จำเป็นต้องใส่ — ช่องที่ 2 และ 3 ไม่บังคับ เว้นว่างไว้ได้ถ้าไม่ต้องการ เก็บอีเมล/LINE ไว้ในเครื่องนี้เท่านั้น
+              (ระบบอัตโนมัติจะส่งรหัสกุญแจสำรองให้บุคคลเหล่านี้เมื่อคุณหายจากระบบเกินเวลาที่คุณกำหนด)
+            </Text>
+            <Text style={styles.contactNote}>
+              ช่องที่ 1 จำเป็นต้องใส่ — ช่องที่ 2 ไม่บังคับ เว้นว่างไว้ได้ถ้าไม่ต้องการ เก็บอีเมล/LINE ไว้ในเครื่องนี้เท่านั้น
               (ไม่ส่งขึ้น server) — ใช้อีเมลหรือ LINE แทนเบอร์โทร เพราะเชื่อมต่อแจ้งเตือนได้โดยไม่มีค่าใช้จ่ายเมื่อฟีเจอร์นี้เปิดใช้งานในอนาคต
             </Text>
 
@@ -413,8 +502,8 @@ export function DMSSetupScreen({ navigation, route }: Props) {
               <View style={styles.noteBox}>
                 <Text style={styles.noteText}>
                   {activeGuardians.length > 0
-                    ? `ผู้ถือกุญแจสำรองปัจจุบัน: ${activeGuardians.map((g) => g.name).join(', ')}`
-                    : 'ยังไม่มีผู้ถือกุญแจสำรอง'}
+                    ? `บุคคลที่คุณเชื่อถือในปัจจุบัน: ${activeGuardians.map((g) => g.name).join(', ')}`
+                    : 'ยังไม่มีบุคคลที่คุณเชื่อถือ'}
                   {' — จะบันทึกด้วยรายชื่อเดิมนี้ (รหัสกุญแจสำรองจะถูกสร้างใหม่ทั้งหมดตามปกติ)'}
                 </Text>
               </View>
@@ -505,9 +594,11 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
       <View style={styles.footer}>
         <Pressable onPress={handleSkip} accessibilityRole="button" style={styles.skipLink}>
-          <Text style={styles.skipLinkText}>{isReconfigure ? 'ยกเลิก กลับไปหน้าตั้งค่า' : 'ข้ามขั้นตอนนี้ไปก่อน'}</Text>
+          <Text style={styles.skipLinkText}>
+            {isReconfigure ? 'ยกเลิก กลับไปหน้าตั้งค่า' : gateChoice === 'no' ? 'ดำเนินการต่อ (ไม่ตั้งค่า)' : 'ข้ามขั้นตอนนี้ไปก่อน'}
+          </Text>
         </Pressable>
-        {enabled && (
+        {showForm && (
           <PrimaryButton
             label={submitting ? 'กำลังตั้งค่า…' : isReconfigure ? 'บันทึกและสร้างรหัสใหม่' : 'ตั้งค่าและสร้างรหัส'}
             onPress={handleSetup}
@@ -537,6 +628,13 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xl },
   toggleLabel: { ...typography.body, fontSize: 15, color: colors.textPrimary },
   fieldLabel: { ...typography.label, fontSize: 16, color: colors.textMuted, marginBottom: spacing.sm },
+  popupTitle: {
+    ...typography.label,
+    fontSize: 17,
+    color: colors.textPrimary,
+    fontWeight: '600',
+    marginBottom: spacing.md,
+  },
   periodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
   periodExplainer: { ...typography.body, fontSize: 16, color: colors.textMuted, lineHeight: 17, marginBottom: spacing.lg },
   notifyCaveat: { ...typography.body, fontSize: 16, color: colors.textMuted, fontStyle: 'italic', lineHeight: 16, marginBottom: spacing.lg },
@@ -553,6 +651,14 @@ const styles = StyleSheet.create({
   periodChipActive: { borderColor: colors.accentTeal, backgroundColor: 'rgba(127,166,177,0.12)' },
   periodChipText: { ...typography.body, fontSize: 15, color: colors.textSecondary },
   periodChipTextActive: { color: colors.textPrimary, fontWeight: '600' },
+  customPeriodChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
+  customPeriodInput: {
+    ...typography.body,
+    fontSize: 15,
+    color: colors.textPrimary,
+    minWidth: 44,
+    paddingVertical: 0,
+  },
   guardianCard: {
     borderWidth: 1,
     borderColor: colors.border,
