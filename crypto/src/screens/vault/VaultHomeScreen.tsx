@@ -167,7 +167,11 @@ export function VaultHomeScreen({ route, navigation }: Props) {
 
   const themeColor = accentColor;
   const Avatar = getAvatarComponent(profile?.avatarId ?? 'cat');
-  const roomTitle = profile?.nickname ? `ห้องลับของ${profile.nickname}` : 'ห้องของฉัน';
+  // Feedback: "font xxx ให้ใช้สีต่างจาก 'ห้องลับของ' เว้น 1-2 เคาะ" — the
+  // nickname now renders in the room's own accent color with a couple of
+  // spaces of breathing room, instead of running straight into the fixed
+  // prefix in one solid color.
+  const roomNickname = profile?.nickname ?? null;
 
   // Feedback: there should be a way to explicitly close the room on
   // exit, with one more reminder that nobody — including the app's own
@@ -185,7 +189,16 @@ export function VaultHomeScreen({ route, navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Avatar size={40} />
-          <Text style={[styles.title, { fontSize: scaled(20) }]}>{roomTitle}</Text>
+          <Text style={[styles.title, { fontSize: scaled(20) }]}>
+            {roomNickname ? (
+              <>
+                ห้องลับของ{'  '}
+                <Text style={{ color: accentColor }}>{roomNickname}</Text>
+              </>
+            ) : (
+              'ห้องของฉัน'
+            )}
+          </Text>
         </View>
         <View style={styles.headerRight}>
           <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Dashboard', { accountId })}>
@@ -232,7 +245,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
               informational, no button. */}
           <View style={[styles.card, styles.dmsCard]}>
             <View style={styles.dmsTextBlock}>
-              <Text style={[styles.dmsTitle, { fontSize: scaled(16) }]}>สถานะความปลอดภัย</Text>
+              <Text style={[styles.dmsTitle, { fontSize: scaled(16) }]}>ยืนยันสถานะ "ใช้งานอยู่/เคลื่อนไหวอยู่"</Text>
               <Text style={[styles.dmsExplainer, { fontSize: scaled(15) }]}>
                 ทุกครั้งที่คุณเข้าห้องนี้สำเร็จ (ปลดล็อกด้วย PIN) ถือว่าเช็คอินให้อัตโนมัติแล้ว — ไม่ต้องกดปุ่มอะไรเพิ่ม
                 หากคุณไม่เข้าห้องนี้เลยเกิน{' '}

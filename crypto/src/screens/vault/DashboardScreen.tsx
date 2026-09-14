@@ -260,12 +260,19 @@ export function DashboardScreen({ navigation, route }: Props) {
               <IconBadge size={32} tint={colors.dangerText}>
                 <DocumentIcon size={16} color={colors.textPrimary} />
               </IconBadge>
-              <Text style={styles.cardTitle}>วันที่ห้องนี้จะถูกลบอัตโนมัติ</Text>
+              <Text style={styles.cardTitle}>
+                วันที่ห้องนี้จะถูกลบอัตโนมัติ{' '}
+                <Text style={styles.cardTitleNote}>
+                  (365 วันนับจากวันที่เข้าใช้งานล่าสุด ,หากไม่ต้องการให้ห้องถูกลบ ต้องล็อคอินเข้าใช้งานเป็นระยะๆ)
+                </Text>
+              </Text>
             </View>
             <Text style={styles.cardSubtext}>
-              {roomStatus?.autoDeleteAt
-                ? `${formatThaiDate(roomStatus.autoDeleteAt)} — นับจากวันเช็คอิน/ใช้งานล่าสุด หากไม่เช็คอินหรือเข้าห้องเลยก่อนวันนี้`
-                : 'ยังไม่มีข้อมูลการใช้งาน'}
+              {roomStatus?.autoDeleteAt ? (
+                <Text style={styles.autoDeleteDate}>{formatThaiDate(roomStatus.autoDeleteAt)}</Text>
+              ) : (
+                'ยังไม่มีข้อมูลการใช้งาน'
+              )}
             </Text>
           </View>
         </ScrollView>
@@ -300,7 +307,17 @@ const styles = StyleSheet.create({
   },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   cardTitle: { ...typography.body, fontSize: 15, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  // Feedback: "ให้ย้าย คำว่า นับจากวันที่เช็คอิน.... ขึ้นไปอยู่ในวงเล็บถัดจากชื่อ box"
+  // — the parenthetical rides along in the title Text but stays visually
+  // secondary (lighter weight/color) so the bold title itself is still
+  // the first thing read.
+  cardTitleNote: { ...typography.body, fontSize: 13, fontWeight: '400', color: colors.textMuted },
   cardSubtext: { ...typography.body, fontSize: 14, color: colors.textSecondary, lineHeight: 19 },
+  // Feedback: "ด้านล่าง ที่เป็นวันที่ ให้ใช้สี text อื่น และ contrast กับ
+  // background เพื่อให้เห็นชัดๆ ตัวใหญ่ๆ" — the actual delete/eligibility
+  // date needs to stand out from the rest of the card text, not blend in
+  // at the same small muted size as everything else.
+  autoDeleteDate: { ...typography.body, fontSize: 22, fontWeight: '700', color: colors.dangerText },
   storageRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   storageText: { ...typography.body, fontSize: 15, color: colors.textSecondary },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surfaceAlt, overflow: 'hidden', marginBottom: spacing.sm },
