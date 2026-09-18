@@ -114,17 +114,25 @@ export async function deleteFile(accountId: string, blobId: string): Promise<voi
   await deleteBlobRecord(accountId, blobId);
 }
 
+/** Web-only choice for what happens to a file once it's decrypted — see downloadAndOpenFile. */
+export type FileOpenChoice = 'open' | 'save' | 'both';
+
 /**
  * Downloads + decrypts one file, then hands it to the OS to open/save:
- * on web, triggers a normal browser download; on native, writes it to the
- * cache dir and opens the share sheet (expo-sharing) so the user can save
- * it wherever they want. Either way, the decrypted bytes only ever exist
- * transiently in memory / the app's own cache — never uploaded anywhere.
+ * on native, writes it to the cache dir and opens the share sheet
+ * (expo-sharing), which itself already presents an open/save/share choice
+ * via the OS. On web there's no equivalent OS-level chooser — a plain
+ * `<a download>` click always force-saves with no way to just view the
+ * file — so `choice` picks what actually happens (default 'save', to
+ * match the old always-download behavior for any caller that doesn't ask
+ * first). Either way, the decrypted bytes only ever exist transiently in
+ * memory / the app's own cache — never uploaded anywhere.
  */
 export async function downloadAndOpenFile(
   accountId: string,
   blob: Pick<BlobMeta, 'blobId' | 'fileName' | 'mimeType'>,
-  masterKeyHex: string
+  masterKeyHex: string,
+  choice: FileOpenChoice = 'save'
 ): Promise<void> {
   const { downloadUrl } = await getDownloadUrl(accountId, blob.blobId);
   const encrypted = await downloadEncryptedBytes(downloadUrl);
@@ -133,18 +141,29 @@ export async function downloadAndOpenFile(
   if (Platform.OS === 'web') {
     // Routed through `any`: this project's tsconfig has no "dom" lib (it's
     // a React Native app), so the browser globals used here (Blob/URL/
-    // document) exist at runtime on web but aren't in scope for the type
-    // checker — this whole branch only ever runs when Platform.OS==='web'.
+    // document/window) exist at runtime on web but aren't in scope for the
+    // type checker — this whole branch only ever runs when Platform.OS==='web'.
     const g = globalThis as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     const blobObject = new g.Blob([plainBytes], { type: blob.mimeType });
     const objectUrl = g.URL.createObjectURL(blobObject);
-    const link = g.document.createElement('a');
-    link.href = objectUrl;
-    link.download = blob.fileName;
-    g.document.body.appendChild(link);
-    link.click();
-    g.document.body.removeChild(link);
-    setTimeout(() => g.URL.revokeObjectURL(objectUrl), 10_000);
+
+    if (choice === 'open' || choice === 'both') {
+      // Opens in a new tab — the browser renders it inline when it can
+      // (PDF/image/text/...), otherwise falls back to its own download
+      // prompt for types it can't display.
+      g.window.open(objectUrl, '_blank');
+    }
+    if (choice === 'save' || choice === 'both') {
+      const link = g.document.createElement('a');
+      link.href = objectUrl;
+      link.download = blob.fileName;
+      g.document.body.appendChild(link);
+      link.click();
+      g.document.body.removeChild(link);
+    }
+    // Give the opened tab / triggered download time to actually read the
+    // blob before its URL is revoked.
+    setTimeout(() => g.URL.revokeObjectURL(objectUrl), 60_000);
     return;
   }
 

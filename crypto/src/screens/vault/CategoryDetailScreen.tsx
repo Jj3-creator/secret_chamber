@@ -17,7 +17,7 @@
 // room (see VaultHomeScreen.tsx's file header) — the authorization
 // choice here records the owner's intent for later.
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable, TextInput, ActivityIndicator, Platform } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -26,7 +26,7 @@ import { ThemedBackground } from '../../components/ThemedBackground';
 import { SafeGraphic } from '../../components/SafeGraphic';
 import { RadioOption } from '../../components/RadioOption';
 import { ArrowLeftIcon, DocumentIcon } from '../../components/icons';
-import { appAlert, appConfirm } from '../../components/AppAlert';
+import { appAlert, appConfirm, appChoice } from '../../components/AppAlert';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { useRoomTheme } from '../../theme/RoomThemeContext';
 import { CATEGORIES, getCategory } from '../../data/categories';
@@ -43,6 +43,7 @@ import {
   PickCanceledError,
   FileTooLargeError,
   type BlobMeta,
+  type FileOpenChoice,
 } from '../../services/categoryFiles';
 import { useVaultSession } from './VaultSessionContext';
 import { useFontScale } from '../../theme/FontScaleContext';
@@ -137,17 +138,34 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
     }
   };
 
-  const handleOpenFile = async (file: BlobMeta) => {
-    if (!masterKeyHex) return;
+  const runFileAction = async (file: BlobMeta, choice: FileOpenChoice) => {
     setBusyBlobId(file.blobId);
     try {
-      await downloadAndOpenFile(accountId, file, masterKeyHex);
+      await downloadAndOpenFile(accountId, file, masterKeyHex!, choice);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       appAlert('เปิดไฟล์ไม่สำเร็จ', `ลองใหม่อีกครั้ง\n\n${reason}`);
     } finally {
       setBusyBlobId(null);
     }
+  };
+
+  // Feedback: "ถ้า click ที่ file ควรให้เลือกว่าจะเปิด หรือ save หรือ
+  // เปิดและ save" — web has no OS-level chooser the way native's share
+  // sheet already offers one, so a plain tap used to just force-download
+  // with no way to simply view the file first. Native keeps its existing
+  // one-tap-into-share-sheet behavior (that sheet already IS the choice).
+  const handleOpenFile = (file: BlobMeta) => {
+    if (!masterKeyHex) return;
+    if (Platform.OS !== 'web') {
+      runFileAction(file, 'save');
+      return;
+    }
+    appChoice(file.fileName, 'ต้องการเปิดไฟล์นี้ หรือบันทึกลงเครื่อง?', [
+      { text: 'เปิด', onPress: () => runFileAction(file, 'open') },
+      { text: 'บันทึก', onPress: () => runFileAction(file, 'save') },
+      { text: 'ทั้งเปิดและบันทึก', onPress: () => runFileAction(file, 'both') },
+    ]);
   };
 
   const handleDeleteFile = (file: BlobMeta) => {

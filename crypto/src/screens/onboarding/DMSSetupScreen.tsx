@@ -314,6 +314,18 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           <Text style={styles.subtitle}>
             แสดงครั้งเดียวเท่านั้น — คัดลอกส่งให้แต่ละคนด้วยตัวเอง (นอกแอป) ระบบไม่เก็บรหัสนี้ซ้ำอีก
           </Text>
+          {/* User question worth answering right here, not just in chat:
+              "ชื่อและรหัสมีการผูกกันไม๊" — no. The server never learns the
+              name at all (see guardianContacts.ts — local-only, never
+              sent). It only checks the token itself; whoever presents it
+              can redeem it. The name below is purely this device's own
+              reminder of who you gave which token to. */}
+          <View style={styles.warnBox}>
+            <Text style={styles.warnText}>
+              ชื่อที่แสดงเป็นเพียงบันทึกส่วนตัวในเครื่องนี้ — ระบบไม่ได้ผูกชื่อกับรหัสจริง ผู้ใดก็ตามที่ถือรหัสนี้สามารถใช้กู้คืนได้ทันที
+              จึงควรส่งรหัสนี้ให้ตรงคนที่ตั้งใจไว้เท่านั้น และเก็บรักษาเหมือนกุญแจจริงชิ้นหนึ่ง
+            </Text>
+          </View>
           {revealed.map((g, i) => (
             <View key={g.nickname} style={styles.tokenCard}>
               <Text style={styles.tokenNickname}>บุคคลที่คุณเชื่อถือ: {g.nickname}</Text>
@@ -460,7 +472,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
             </Text>
 
             <View style={[styles.toggleRow, { marginBottom: spacing.xs }]}>
-              <Text style={styles.toggleLabel}>แจ้งเตือนทายาทเมื่อครบกำหนด</Text>
+              <Text style={styles.toggleLabel}>แจ้งเตือนบุคคลที่คุณเชื่อถือเมื่อครบกำหนด</Text>
               <Switch value={notifyEnabled} onValueChange={setNotifyEnabled} />
             </View>
             <Text style={styles.notifyCaveat}>
@@ -578,8 +590,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
             <View style={styles.noteBox}>
               <Text style={styles.noteText}>
-                ฟีเจอร์แจ้งเตือนอัตโนมัติยังไม่เปิดใช้งาน — คุณต้องคัดลอกรหัสที่จะแสดงในขั้นถัดไปแล้วหาวิธีแจ้งรหัสนี้ให้แต่ละคนด้วยตัวเอง
-                (นอกแอป) ตามวิธีที่คุณสะดวก — จะแจ้งตอนนี้เลย หรือรอไว้แจ้งทีหลังก็ได้ ขอแค่คุณเป็นคนตัดสินใจเองว่าจะแจ้งเมื่อไหร่และแจ้งยังไง
+                คุณควรคัดลอกรหัสที่จะแสดงในขั้นถัดไปและสามารถหาแจ้งรหัสนี้ให้บุคคลที่คุณเชื่อถือด้วยตัวเอง (นอกแอป) ตามวิธีที่คุณสะดวก
               </Text>
             </View>
 

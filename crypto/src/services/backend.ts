@@ -268,6 +268,31 @@ export async function listCategoryBlobs(accountId: string, categoryId: string): 
 }
 
 /**
+ * Total attached-file count across ALL of this account's safes — used by
+ * Dashboard's "สถานะความทรงจำ" card (feedback: "(ยังไม่นับไฟล์แนบ)" should
+ * say how many there actually are, not just disclaim that it isn't
+ * counting). A HEAD request with Prefer: count=exact asks PostgREST for
+ * just the row count via the Content-Range response header — no need to
+ * download every blob row (name/size/etc.) just to count them.
+ */
+export async function getAccountFileCount(accountId: string): Promise<number> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/blobs?account_id=eq.${accountId}&select=blob_id`, {
+    method: 'HEAD',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      'x-account-id': accountId,
+      Prefer: 'count=exact',
+    },
+  });
+  if (!res.ok) throw new Error(`getAccountFileCount: unexpected ${res.status}`);
+  // Content-Range looks like "0-24/117" (or "*/0" for an empty result).
+  const range = res.headers.get('content-range');
+  const total = range?.split('/')[1];
+  return total && total !== '*' ? parseInt(total, 10) || 0 : 0;
+}
+
+/**
  * Removes a file's metadata row (direct PostgREST delete, gated by the
  * blobs_delete_own RLS policy). Note: this does NOT delete the underlying
  * R2 object — cleaning up the orphaned ciphertext is an operational task,

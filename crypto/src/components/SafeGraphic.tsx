@@ -24,7 +24,11 @@ interface Props {
   opacity?: number;
 }
 
-export function SafeGraphic({ width, height, color, opacity = 0.5 }: Props) {
+// Feedback: "ปรับรูปสี่เหลี่ยมเป็นรูปเซฟที่ถูกล็อคไว้" — the line art was
+// already this shape, but at the old default opacity it read as faint
+// background texture rather than a clearly recognizable locked safe.
+// Bumped up so it actually reads as one at a glance on a real phone.
+export function SafeGraphic({ width, height, color, opacity = 0.68 }: Props) {
   return (
     <Svg width={width} height={height} viewBox="0 0 100 112" style={{ position: 'absolute' }}>
       {/* outer door frame */}

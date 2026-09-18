@@ -286,7 +286,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                   <IconBadge size={30} tint={themeColor} style={styles.tileIcon}>
                     <Icon size={15} color={colors.textPrimary} />
                   </IconBadge>
-                  <Text style={[styles.tileName, { fontSize: scaled(11) }]} numberOfLines={2}>
+                  <Text style={[styles.tileName, { fontSize: scaled(12) }]} numberOfLines={2}>
                     {cat.nameTh}
                   </Text>
                   {/* Feedback: show who's authorized, but only when a
@@ -322,7 +322,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
                       <IconBadge size={30} tint={themeColor} style={styles.tileIcon}>
                         <DocumentIcon size={15} color={colors.textPrimary} />
                       </IconBadge>
-                      <Text style={[styles.tileName, { fontSize: scaled(11) }]} numberOfLines={2}>
+                      <Text style={[styles.tileName, { fontSize: scaled(12) }]} numberOfLines={2}>
                         {customName}
                       </Text>
                     </>
@@ -431,9 +431,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tileArt: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 14, overflow: 'hidden' },
-  tileNumber: { ...typography.label, fontSize: 13, position: 'absolute', top: 8, left: 10 },
+  // Feedback: "ปรับตัวเลขและตัวหนังสือ ให้ใหญ่ขึ้น" — bumped back up from
+  // the earlier 13/11 shrink (that was a fix for tile #6's 2-line name
+  // clipping — the taller aspectRatio above already covers that now, so
+  // there's room to size back up without reintroducing the clip).
+  tileNumber: { ...typography.label, fontSize: 16, fontWeight: '700', position: 'absolute', top: 8, left: 10 },
   tileIcon: { marginBottom: spacing.xs },
-  tileName: { ...typography.body, fontSize: 11, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  tileName: { ...typography.body, fontSize: 12, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
   tileAuthName: { ...typography.body, fontSize: 10, color: colors.textMuted, textAlign: 'center', marginTop: 2 },
   // Unnamed custom slots — a big standalone number instead of a text
   // row, so it's obviously a placeholder waiting to be named, not a

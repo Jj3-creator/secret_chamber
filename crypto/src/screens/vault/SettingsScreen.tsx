@@ -47,6 +47,7 @@ import { useRoomTheme } from '../../theme/RoomThemeContext';
 import { FONT_SCALE_OPTIONS, useFontScale } from '../../theme/FontScaleContext';
 import { loadRoomProfile, saveRoomProfile } from '../../services/localProfile';
 import { getAccountStatus } from '../../services/backend';
+import { loadGuardianContacts } from '../../services/guardianContacts';
 import { derivePinKey, wrapVaultKey } from '../../services/vault';
 import { saveDeviceLock } from '../../services/deviceLock';
 import { useVaultSession } from './VaultSessionContext';
@@ -67,6 +68,8 @@ export function SettingsScreen({ navigation, route }: Props) {
   const { fontScaleId, setFontScaleId, scaled } = useFontScale();
   const { masterKeyHex } = useVaultSession();
   const [notifyDueAt, setNotifyDueAt] = useState<string | null>(null);
+  const [dmsDays, setDmsDays] = useState<number | null>(null);
+  const [guardianNames, setGuardianNames] = useState<string[]>([]);
   const [loadingNotify, setLoadingNotify] = useState(true);
 
   const [nickname, setNickname] = useState('');
@@ -85,6 +88,7 @@ export function SettingsScreen({ navigation, route }: Props) {
           setNotifyDueAt(
             new Date(new Date(status.dmsHeartbeatAt).getTime() + status.dmsThresholdHours * 60 * 60 * 1000).toISOString()
           );
+          setDmsDays(Math.round(status.dmsThresholdHours / 24));
         }
       })
       .finally(() => {
@@ -92,6 +96,9 @@ export function SettingsScreen({ navigation, route }: Props) {
       });
     loadRoomProfile(accountId).then((profile) => {
       if (!cancelled && profile?.nickname) setNickname(profile.nickname);
+    });
+    loadGuardianContacts(accountId).then((record) => {
+      if (!cancelled && record) setGuardianNames(record.guardians.map((g) => g.name));
     });
     return () => {
       cancelled = true;
@@ -264,19 +271,33 @@ export function SettingsScreen({ navigation, route }: Props) {
               style={styles.saveButton}
             />
 
-            <Text style={styles.sectionLabel}>ผู้ถือกุญแจสำรอง / กรอบเวลาเปิดสิทธิ์</Text>
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
-                {loadingNotify
-                  ? 'กำลังโหลด…'
-                  : notifyDueAt
-                    ? `วันที่รหัสกุญแจสำรองเริ่มใช้งานได้: ${formatThaiDate(notifyDueAt)} — ถ้าคุณไม่เข้าห้องนี้เลยก่อนวันนี้ (วันที่ระบบแจ้งเตือนอัตโนมัติแก่รายชื่อผู้ถือกุญแจสำรอง — ฟีเจอร์นี้ยังไม่เปิดใช้งาน)`
-                    : 'ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท'}
-              </Text>
+            <Text style={styles.sectionLabel}>ผู้ที่คุณไว้ใจ / แจ้งหลังจากพ้นกี่วันนับจากคุณล็อคอินครั้งสุดท้าย</Text>
+            <View style={styles.infoBoxRow}>
+              <View style={[styles.infoBox, styles.infoBoxHalf]}>
+                <Text style={styles.infoBoxLabel}>ชื่อ</Text>
+                <Text style={styles.infoText}>
+                  {loadingNotify
+                    ? 'กำลังโหลด…'
+                    : guardianNames.length > 0
+                      ? guardianNames.join(', ')
+                      : 'ยังไม่ได้ตั้งกุญแจสำหรับบุคคลที่คุณไว้ใจ'}
+                </Text>
+              </View>
+              <View style={[styles.infoBox, styles.infoBoxHalf]}>
+                <Text style={styles.infoBoxLabel}>จำนวนวัน</Text>
+                <Text style={styles.infoText}>
+                  {loadingNotify ? 'กำลังโหลด…' : dmsDays != null ? `${dmsDays} วัน` : '—'}
+                </Text>
+              </View>
             </View>
+            {notifyDueAt && (
+              <Text style={styles.infoSubtext}>
+                จะแจ้งเตือนอัตโนมัติถ้าไม่ล็อกอินก่อนวันที่ {formatThaiDate(notifyDueAt)} (ฟีเจอร์แจ้งเตือนอัตโนมัตินี้ยังไม่เปิดใช้งาน)
+              </Text>
+            )}
             <PrimaryButton
               variant="secondary"
-              label="แก้ไขผู้ถือกุญแจสำรอง / กรอบเวลา"
+              label="แก้ไขผู้ที่คุณไว้ใจ / จำนวนวัน"
               onPress={() => navigation.navigate('DMSSetup', { accountId, mode: 'reconfigure' })}
               style={styles.saveButton}
             />
@@ -318,5 +339,11 @@ const styles = StyleSheet.create({
   fontNote: { ...typography.body, fontSize: 13, color: colors.textMuted, fontStyle: 'italic', marginBottom: spacing.md },
   saveButton: { marginTop: spacing.sm, marginBottom: spacing.lg },
   infoBox: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: spacing.md },
+  // Feedback: "เปลี่ยนกรอบเป็น 2 กรอบ ชื่อ. จำนวนวัน" — split from one
+  // combined sentence into two side-by-side boxes, one per fact.
+  infoBoxRow: { flexDirection: 'row', gap: spacing.sm },
+  infoBoxHalf: { flex: 1 },
+  infoBoxLabel: { ...typography.label, fontSize: 12, color: colors.textMuted, marginBottom: 4 },
   infoText: { ...typography.body, fontSize: 15, color: colors.textSecondary, lineHeight: 20 },
+  infoSubtext: { ...typography.body, fontSize: 13, color: colors.textMuted, lineHeight: 18, marginTop: spacing.sm },
 });

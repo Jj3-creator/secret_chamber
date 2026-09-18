@@ -30,7 +30,7 @@ import { ArrowLeftIcon, ChartIcon, CheckCircleIcon, DocumentIcon, LockClosedIcon
 import { IconBadge } from '../../components/IconBadge';
 import { ThemedBackground } from '../../components/ThemedBackground';
 import { colors, spacing, typography } from '../../theme/tokens';
-import { getAccountStatus, getActivityLog, type ActivityLogEntry } from '../../services/backend';
+import { getAccountStatus, getActivityLog, getAccountFileCount, type ActivityLogEntry } from '../../services/backend';
 import { loadDeviceLock } from '../../services/deviceLock';
 import { loadRoomProfile } from '../../services/localProfile';
 import { hasCategoryNote } from '../../services/categoryNotes';
@@ -47,8 +47,8 @@ const ALL_SLOT_IDS = [...CATEGORIES.map((c) => c.id), ...CUSTOM_SLOT_IDS];
 
 const EVENT_LABELS: Record<ActivityLogEntry['eventType'], string> = {
   upload: 'อัปโหลดไฟล์',
-  heartbeat: 'เช็คอินความปลอดภัย',
-  dms_setup: 'ตั้งค่ากุญแจไขความลับสำหรับทายาท',
+  heartbeat: 'วันที่ล็อคอินล่าสุด',
+  dms_setup: 'ตั้งกุญแจสำหรับบุคคลที่คุณไว้ใจ',
 };
 
 function formatThaiDateTime(iso: string): string {
@@ -84,6 +84,7 @@ interface RoomStatus {
   hasNickname: boolean;
   dmsConfigured: boolean;
   notesFilledCount: number;
+  fileCount: number;
   notifyDueAt: string | null;
   autoDeleteAt: string | null;
 }
@@ -101,12 +102,13 @@ export function DashboardScreen({ navigation, route }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [status, log, lock, profile, noteFlags] = await Promise.all([
+        const [status, log, lock, profile, noteFlags, fileCount] = await Promise.all([
           getAccountStatus(accountId),
           getActivityLog(accountId),
           loadDeviceLock(),
           loadRoomProfile(accountId),
           Promise.all(ALL_SLOT_IDS.map((id) => hasCategoryNote(accountId, id))),
+          getAccountFileCount(accountId),
         ]);
         if (cancelled) return;
         setUsedBytes(status.storageUsedBytes);
@@ -126,6 +128,7 @@ export function DashboardScreen({ navigation, route }: Props) {
           hasNickname: !!profile?.nickname,
           dmsConfigured: status.dmsThresholdHours != null,
           notesFilledCount: noteFlags.filter(Boolean).length,
+          fileCount,
           notifyDueAt,
           autoDeleteAt,
         });
@@ -237,7 +240,7 @@ export function DashboardScreen({ navigation, route }: Props) {
               <Text style={styles.cardTitle}>สถานะความทรงจำ</Text>
             </View>
             <Text style={styles.cardSubtext}>
-              {roomStatus?.notesFilledCount ?? 0} จาก {ALL_SLOT_IDS.length} ตู้มีข้อความบันทึกไว้แล้ว (ยังไม่นับไฟล์แนบ)
+              {roomStatus?.notesFilledCount ?? 0} จาก {ALL_SLOT_IDS.length} ตู้มีข้อความบันทึกไว้แล้ว (มี {roomStatus?.fileCount ?? 0} ไฟล์แนบ)
             </Text>
           </View>
 
@@ -249,9 +252,14 @@ export function DashboardScreen({ navigation, route }: Props) {
               <Text style={styles.cardTitle}>วันที่รหัสกุญแจสำรองเริ่มใช้งานได้</Text>
             </View>
             <Text style={styles.cardSubtext}>
-              {roomStatus?.notifyDueAt
-                ? `${formatThaiDate(roomStatus.notifyDueAt)} — ถ้าคุณไม่เข้าห้องนี้เลยก่อนวันนี้ (วันที่ระบบแจ้งเตือนอัตโนมัติแก่รายชื่อผู้ถือกุญแจสำรอง — ฟีเจอร์นี้ยังไม่เปิดใช้งาน)`
-                : 'ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท'}
+              {roomStatus?.notifyDueAt ? (
+                <>
+                  ถ้าคุณไม่เข้าห้องนี้เลยก่อนวันที่ <Text style={styles.autoDeleteDate}>{formatThaiDate(roomStatus.notifyDueAt)}</Text> ระบบจะแจ้งเตือนอัตโนมัติแก่รายชื่อบุคคลที่ท่านไว้ใจ{' '}
+                  <Text style={styles.cardTitleNote}>(ฟีเจอร์แจ้งเตือนอัตโนมัตินี้ยังไม่เปิดใช้งาน)</Text>
+                </>
+              ) : (
+                'ยังไม่ได้ตั้งกุญแจสำหรับบุคคลที่คุณไว้ใจ'
+              )}
             </Text>
           </View>
 

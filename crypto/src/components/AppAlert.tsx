@@ -58,6 +58,19 @@ export function appConfirm(
   });
 }
 
+/**
+ * A generic multi-button action sheet — for choices beyond the built-in
+ * alert (1 button) / confirm (2 buttons) shapes, e.g. "เปิด / บันทึก /
+ * ทั้งสองอย่าง" when tapping a saved file (see categoryFiles.ts).
+ */
+export function appChoice(
+  title: string,
+  message: string,
+  buttons: Array<{ text: string; onPress: () => void; style?: 'default' | 'destructive' | 'cancel' }>
+): void {
+  show({ title, message, buttons: [...buttons, { text: 'ยกเลิก', style: 'cancel', onPress: () => {} }] });
+}
+
 function show(state: AlertState) {
   if (showFn) {
     showFn(state);
