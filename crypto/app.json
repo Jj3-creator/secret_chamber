@@ -6,8 +6,22 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "secretchamber",
-    "ios": { "supportsTablet": true },
-    "android": {},
-    "web": { "bundler": "metro" }
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.secretchamber.app"
+    },
+    "android": {
+      "package": "com.secretchamber.app",
+      "versionCode": 1
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8eb579d4-5c6a-4344-8263-4e57762db6d7"
+      }
+    },
+    "owner": "jjtecha3"
   }
 }

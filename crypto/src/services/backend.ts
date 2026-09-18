@@ -95,6 +95,17 @@ export interface DmsGuardianInput {
   // (only if the owner chose to type it in), and why it's still never the
   // raw recovery token itself.
   guardianEmail?: string | null;
+  // Same trade-off, for SMS. See 0007_line_sms_notify.sql.
+  guardianPhone?: string | null;
+  // Request flag only — dms-setup generates the actual link code
+  // server-side (never client-supplied) if this is true. See that
+  // function's own comment.
+  wantLine?: boolean;
+}
+
+export interface SetupDmsResult {
+  /** Keyed by shareIndex — null for any guardian who didn't request LINE linking. */
+  lineLinkCodes: Array<{ shareIndex: number; lineLinkCode: string | null }>;
 }
 
 /** Registers (or replaces) an account's Dead Man's Switch guardians + threshold. See dms-setup/index.ts. */
@@ -102,7 +113,7 @@ export async function setupDms(
   accountId: string,
   thresholdHours: number,
   guardians: DmsGuardianInput[]
-): Promise<void> {
+): Promise<SetupDmsResult> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/dms-setup`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
@@ -114,6 +125,8 @@ export async function setupDms(
         token_hash: g.tokenHash,
         wrapped: g.wrapped,
         guardian_email: g.guardianEmail ?? null,
+        guardian_phone: g.guardianPhone ?? null,
+        want_line: g.wantLine === true,
       })),
     }),
   });
@@ -121,6 +134,14 @@ export async function setupDms(
     const body = await res.json().catch(() => ({}));
     throw new Error(`setupDms: ${res.status} ${body?.error ?? ''}`);
   }
+  const body = await res.json().catch(() => ({}));
+  const lineLinkCodes = Array.isArray(body?.line_link_codes)
+    ? body.line_link_codes.map((r: { share_index: number; line_link_code: string | null }) => ({
+        shareIndex: r.share_index,
+        lineLinkCode: r.line_link_code,
+      }))
+    : [];
+  return { lineLinkCodes };
 }
 
 /** A guardian's own recovery code isn't eligible yet — thrown by requestGuardianShare. */

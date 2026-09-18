@@ -5,12 +5,14 @@
 //
 // Real crypto + real backend calls (vault.ts's createRecoveryShares +
 // wrapVaultKey, backend.ts's setupDms — the same dms-setup Edge Function
-// tested in Part 2). What's NOT real: actually notifying anyone by SMS/
-// LINE — that needs a third-party provider (Twilio, LINE Messaging API)
-// and API keys this session doesn't have. What this screen produces
-// instead is a recovery token per guardian, which the owner hands over
-// out-of-band (print it, say it, write it down) — exactly like handing
-// someone a physical spare key.
+// tested in Part 2). Automatic notification (see dms-notify/index.ts) now
+// covers email (confirmed working end-to-end against a live Resend
+// account), plus SMS via Twilio and LINE via the Messaging API (both
+// wired up but not yet smoke-tested against real provider credentials —
+// see that function's own header). Regardless of channel, the owner
+// still separately hands over the actual recovery token out-of-band
+// (print it, say it, write it down) — exactly like handing someone a
+// physical spare key; no channel here ever transmits the token itself.
 //
 // Guardian key design: rather than requiring each guardian to have their
 // own pre-existing app account/PIN (a much bigger feature), the random
@@ -47,6 +49,12 @@ import { useVaultSession } from '../vault/VaultSessionContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'DMSSetup'>;
 
+// ⚠️ Placeholder — swap for the real LINE Official Account's Basic ID
+// (the "@xxxxx" LINE shows on its profile/QR page) once it exists. Shown
+// to the owner on the reveal screen so they know which OA to tell the
+// guardian to add as a friend before sending the link code.
+const LINE_OA_ADD_FRIEND_HINT = 'ยังไม่ได้ตั้งค่า — ดูใน LINE Official Account Manager';
+
 const PERIOD_OPTIONS = [
   { label: '7 วัน', hours: 7 * 24 },
   { label: '14 วัน', hours: 14 * 24 },
@@ -69,9 +77,17 @@ interface Guardian {
   name: string;
   email: string;
   lineId: string;
+  // Feedback: "ต้องการให้ notify line id, และ sms ได้" — phone is the SMS
+  // equivalent of email above (see backend.ts's guardianPhone). lineId
+  // above stays a local-only free-text note (unchanged) — it's a human
+  // handle, not something LINE's API can message directly, so it can't
+  // by itself drive real notifications; wantLine is the actual opt-in
+  // for that (see the server-generated link code flow below).
+  phone: string;
+  wantLine: boolean;
 }
 
-const emptyGuardian = (): Guardian => ({ name: '', email: '', lineId: '' });
+const emptyGuardian = (): Guardian => ({ name: '', email: '', lineId: '', phone: '', wantLine: false });
 const makeGuardianSlots = (): Guardian[] => Array.from({ length: MAX_GUARDIANS }, emptyGuardian);
 
 interface RevealedGuardian {
@@ -84,6 +100,10 @@ interface RevealedGuardian {
   // knows whether an unwrapped value IS the master key (threshold 1) or
   // just one Shamir share that still needs combining with others.
   threshold: number;
+  // Set only if this guardian opted into LINE — the 6-digit code they
+  // send as a LINE message to link their account (see line-webhook's own
+  // comment). Shown alongside the recovery code, not part of it.
+  lineLinkCode: string | null;
 }
 
 /**
@@ -176,7 +196,10 @@ export function DMSSetupScreen({ navigation, route }: Props) {
       if (record && record.guardians.length > 0) {
         const slots = makeGuardianSlots();
         record.guardians.slice(0, MAX_GUARDIANS).forEach((g, i) => {
-          slots[i] = { name: g.name, email: g.email ?? '', lineId: g.lineId ?? '' };
+          // phone/wantLine aren't in guardianContacts.ts's stored record
+          // yet (it predates this feedback) — reconfigure just starts
+          // those blank/off; re-submitting still works fine either way.
+          slots[i] = { name: g.name, email: g.email ?? '', lineId: g.lineId ?? '', phone: '', wantLine: false };
         });
         setGuardians(slots);
         setOriginalGuardians(slots);
@@ -245,14 +268,16 @@ export function DMSSetupScreen({ navigation, route }: Props) {
     // must agree). A single guardian makes the choice moot either way.
     const effectiveThreshold = names.length === 1 ? 1 : verifyMode === 'all' ? names.length : 1;
 
-    // Feedback: "อยากให้ APP แจ้งเตือน id line และ อีเมล์เลยได้ไม๊" —
-    // email only (see dms-notify/index.ts for why LINE isn't included),
-    // and only for guardians who actually gave one (already an optional
-    // field) AND only if the "แจ้งเตือน...เมื่อครบกำหนด" switch above is
-    // on — that switch is now this feature's real master control, not
-    // just a decorative preference, so turning it off means no address is
-    // sent to the server at all even if one was typed in.
+    // Feedback: "อยากให้ APP แจ้งเตือน id line และ อีเมล์เลยได้ไม๊" /
+    // "ต้องการให้ notify line id, และ sms ได้" — all three channels are
+    // gated the same way: only for guardians who actually gave that
+    // contact info (or opted into LINE), AND only if the
+    // "แจ้งเตือน...เมื่อครบกำหนด" switch above is on — that switch is this
+    // feature's real master control, not just a decorative preference, so
+    // turning it off means nothing extra is sent to the server at all.
     const emails = notifyEnabled ? activeGuardians.map((g) => g.email.trim() || null) : activeGuardians.map(() => null);
+    const phones = notifyEnabled ? activeGuardians.map((g) => g.phone.trim() || null) : activeGuardians.map(() => null);
+    const wantLines = notifyEnabled ? activeGuardians.map((g) => g.wantLine) : activeGuardians.map(() => false);
 
     setSubmitting(true);
     try {
@@ -280,6 +305,8 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                 tokenHash: sha256Hex(tokens[i]),
                 wrapped: await wrapVaultKey(masterKeyHex, guardianKeys[i].masterKeyHex),
                 guardianEmail: emails[i],
+                guardianPhone: phones[i],
+                wantLine: wantLines[i],
               }))
             )
           : await (async () => {
@@ -295,10 +322,12 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                 tokenHash: sha256Hex(tokens[i]),
                 wrapped: wrapped[i],
                 guardianEmail: emails[i],
+                guardianPhone: phones[i],
+                wantLine: wantLines[i],
               }));
             })();
 
-      await setupDms(accountId, periodHours, rows);
+      const { lineLinkCodes } = await setupDms(accountId, periodHours, rows);
 
       // Local-only record of who the guardians are (name + how to reach
       // them) and the chosen threshold — never sent to the server (see
@@ -319,6 +348,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
           token: tokens[i],
           shareIndex: rows[i].shareIndex,
           threshold: effectiveThreshold,
+          lineLinkCode: lineLinkCodes.find((c) => c.shareIndex === rows[i].shareIndex)?.lineLinkCode ?? null,
         }))
       );
     } catch (err) {
@@ -374,6 +404,19 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                   {code}
                 </Text>
                 <PrimaryButton variant="secondary" label="คัดลอก" onPress={() => handleCopyToken(code)} />
+                {g.lineLinkCode && (
+                  <View style={styles.lineLinkBox}>
+                    <Text style={styles.lineLinkText}>
+                      ให้ {g.nickname} เพิ่มเพื่อน LINE OA ของแอปนี้ก่อน ({LINE_OA_ADD_FRIEND_HINT}) แล้วพิมพ์รหัสนี้ส่งเป็นข้อความ เพื่อเชื่อมบัญชี LINE สำหรับรับการแจ้งเตือนอัตโนมัติ:
+                    </Text>
+                    <Text style={styles.tokenValue}>{g.lineLinkCode}</Text>
+                    <PrimaryButton
+                      variant="secondary"
+                      label="คัดลอกรหัสเชื่อม LINE"
+                      onPress={() => handleCopyToken(g.lineLinkCode!)}
+                    />
+                  </View>
+                )}
               </View>
             );
           })}
@@ -517,8 +560,8 @@ export function DMSSetupScreen({ navigation, route }: Props) {
               <Switch value={notifyEnabled} onValueChange={setNotifyEnabled} />
             </View>
             <Text style={styles.notifyCaveat}>
-              (ถ้าเปิดไว้ ระบบจะส่งอีเมลแจ้งเตือนให้บุคคลที่คุณเชื่อถือที่กรอกอีเมลไว้โดยอัตโนมัติเมื่อครบกำหนด — อีเมลนี้เป็นแค่การเตือนให้ใช้รหัสกุญแจสำรองที่คุณให้ไปแล้ว
-              ไม่ใช่การส่งรหัสกุญแจสำรองเอง ระบบไม่เคยเก็บรหัสกุญแจสำรองไว้ที่ server เลย — LINE ยังไม่รองรับการแจ้งเตือนอัตโนมัติในตอนนี้)
+              (ถ้าเปิดไว้ ระบบจะแจ้งเตือนบุคคลที่คุณเชื่อถือโดยอัตโนมัติเมื่อครบกำหนด ผ่านทุกช่องทางที่กรอกไว้ให้ (อีเมล/เบอร์โทร/LINE ที่เชื่อมบัญชีแล้ว) —
+              ข้อความนี้เป็นแค่การเตือนให้ใช้รหัสกุญแจสำรองที่คุณให้ไปแล้ว ไม่ใช่การส่งรหัสกุญแจสำรองเอง ระบบไม่เคยเก็บรหัสกุญแจสำรองไว้ที่ server เลย)
             </Text>
 
             <View style={styles.warnBox}>
@@ -530,11 +573,11 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
             <Text style={styles.fieldLabel}>บุคคลที่คุณเชื่อถือ ({MIN_GUARDIANS}-{MAX_GUARDIANS} คน)</Text>
             <Text style={styles.contactNote}>
-              (ถ้าเปิด "แจ้งเตือน...เมื่อครบกำหนด" ด้านบนไว้ ระบบจะส่งอีเมลเตือนบุคคลเหล่านี้ให้ใช้รหัสกุญแจสำรองที่คุณให้ไปแล้ว — ไม่ใช่ส่งรหัสกุญแจสำรองเอง)
+              (ถ้าเปิด "แจ้งเตือน...เมื่อครบกำหนด" ด้านบนไว้ ระบบจะเตือนบุคคลเหล่านี้ผ่านช่องทางที่กรอกไว้ให้ใช้รหัสกุญแจสำรองที่คุณให้ไปแล้ว — ไม่ใช่ส่งรหัสกุญแจสำรองเอง)
             </Text>
             <Text style={styles.contactNote}>
-              ช่องที่ 1 จำเป็นต้องใส่ — ช่องที่ 2 ไม่บังคับ เว้นว่างไว้ได้ถ้าไม่ต้องการ อีเมลที่กรอกจะถูกส่งขึ้น server เพื่อใช้แจ้งเตือนเท่านั้น (ถ้าเปิดใช้งาน) —
-              LINE ID ยังคงเก็บไว้ในเครื่องนี้เท่านั้น ไม่ส่งขึ้น server เพราะยังไม่รองรับการแจ้งเตือนผ่าน LINE
+              ช่องที่ 1 จำเป็นต้องใส่ — ช่องที่ 2 ไม่บังคับ เว้นว่างไว้ได้ถ้าไม่ต้องการ อีเมลและเบอร์โทรที่กรอกจะถูกส่งขึ้น server เพื่อใช้แจ้งเตือนเท่านั้น (ถ้าเปิดใช้งาน) —
+              LINE ID (ช่องบันทึกไว้ดูเอง) ยังคงเก็บไว้ในเครื่องนี้เท่านั้น ไม่ส่งขึ้น server — ถ้าต้องการแจ้งเตือนผ่าน LINE ให้ติ๊กช่องด้านล่างแทน ระบบจะสร้างรหัสเชื่อมบัญชีแยกต่างหากให้
             </Text>
 
             {isReconfigure && (
@@ -586,13 +629,28 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                       style={[styles.input, styles.inputHalf]}
                     />
                     <TextInput
-                      value={guardian.lineId}
-                      onChangeText={(v) => updateGuardian(i, 'lineId', v)}
-                      placeholder="LINE ID (ไม่บังคับ)"
+                      value={guardian.phone}
+                      onChangeText={(v) => updateGuardian(i, 'phone', v)}
+                      placeholder="เบอร์โทร (ไม่บังคับ)"
                       placeholderTextColor={colors.textMuted}
+                      keyboardType="phone-pad"
                       style={[styles.input, styles.inputHalf]}
                     />
                   </View>
+                  <TextInput
+                    value={guardian.lineId}
+                    onChangeText={(v) => updateGuardian(i, 'lineId', v)}
+                    placeholder="LINE ID (บันทึกไว้ดูเองเท่านั้น — ไม่บังคับ)"
+                    placeholderTextColor={colors.textMuted}
+                    style={styles.input}
+                  />
+                  <Checkbox
+                    checked={guardian.wantLine}
+                    onToggle={() =>
+                      setGuardians((prev) => prev.map((g, idx) => (idx === i ? { ...g, wantLine: !g.wantLine } : g)))
+                    }
+                    label='รับแจ้งเตือนผ่าน LINE ด้วย — ระบบจะสร้างรหัสเชื่อมบัญชี LINE ให้ในขั้นถัดไป (ต้องให้ผู้รับ "เพิ่มเพื่อน" LINE OA ของแอปก่อน)'
+                  />
                 </View>
               ))
             )}
@@ -751,4 +809,13 @@ const styles = StyleSheet.create({
   tokenNickname: { ...typography.body, fontSize: 16, fontWeight: '600', color: colors.textPrimary },
   tokenLabel: { ...typography.label, fontSize: 16, color: colors.textMuted, marginTop: -4 },
   tokenValue: { ...typography.mono, fontSize: 16, color: colors.textSecondary },
+  lineLinkBox: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    padding: spacing.sm,
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  lineLinkText: { ...typography.body, fontSize: 13, color: colors.textMuted, lineHeight: 18 },
 });

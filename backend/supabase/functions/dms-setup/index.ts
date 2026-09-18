@@ -31,12 +31,20 @@ interface GuardianInput {
   // Optional — see 0006_dms_notify.sql's own comment for the narrow
   // "email only, never the token itself" trade-off this represents.
   guardian_email: string | null;
+  // Same trade-off, for SMS. See 0007_line_sms_notify.sql.
+  guardian_phone: string | null;
+  // Whether this guardian wants a LINE link code generated (see below) —
+  // not itself a value to store, just a request flag; the actual code is
+  // server-generated, never client-supplied (so it can't collide/be
+  // guessed by the client).
+  want_line: boolean;
 }
 
-// Loose but real validation — this only ever gates which address gets a
-// reminder email, never anything security-sensitive, so it doesn't need
-// to be a strict RFC 5322 parser.
+// Loose but real validation — this only ever gates which address/number
+// gets a reminder, never anything security-sensitive, so it doesn't need
+// to be a strict RFC 5322/E.164 parser.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^\+?[0-9()\-\s]{6,20}$/;
 
 function parseGuardian(raw: unknown): GuardianInput | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -45,6 +53,7 @@ function parseGuardian(raw: unknown): GuardianInput | null {
   const tokenHash = g.token_hash;
   const wrapped = g.wrapped as Record<string, unknown> | null | undefined;
   const emailRaw = g.guardian_email;
+  const phoneRaw = g.guardian_phone;
 
   if (typeof shareIndex !== 'number' || !Number.isInteger(shareIndex) || shareIndex < 1 || shareIndex > 255) {
     return null;
@@ -61,13 +70,24 @@ function parseGuardian(raw: unknown): GuardianInput | null {
     return null;
   }
   if (emailRaw != null && (typeof emailRaw !== 'string' || !EMAIL_RE.test(emailRaw))) return null;
+  if (phoneRaw != null && (typeof phoneRaw !== 'string' || !PHONE_RE.test(phoneRaw))) return null;
 
   return {
     share_index: shareIndex,
     token_hash: tokenHash,
     wrapped: { cipherText: wrapped.cipherText, iv: wrapped.iv },
     guardian_email: (emailRaw as string | null) ?? null,
+    guardian_phone: (phoneRaw as string | null) ?? null,
+    want_line: g.want_line === true,
   };
+}
+
+/** 6-digit numeric code a guardian types as a LINE message to link their account — see 0007_line_sms_notify.sql. */
+function generateLinkCode(): string {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  const n = new DataView(bytes.buffer).getUint32(0) % 1_000_000;
+  return n.toString().padStart(6, '0');
 }
 
 serve(async (req: Request) => {
@@ -142,16 +162,34 @@ serve(async (req: Request) => {
     return json({ error: 'internal_error' }, 500);
   }
 
-  const { error: insertError } = await supabase.from('dms_guardians').insert(
-    guardians.map((g) => ({
-      account_id: accountId,
-      share_index: g.share_index,
-      token_hash: g.token_hash,
-      wrapped_cipher_text: g.wrapped.cipherText,
-      wrapped_iv: g.wrapped.iv,
-      guardian_email: g.guardian_email,
-    }))
-  );
+  // guardian_line_link_code has a unique partial index (0007's own
+  // comment) — vanishingly unlikely to collide at 1-in-a-million odds per
+  // pair, but retried a few times rather than trusting that.
+  let lineLinkCodes: (string | null)[] = guardians.map((g) => (g.want_line ? generateLinkCode() : null));
+  let insertError: { message: string; code?: string } | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { error } = await supabase.from('dms_guardians').insert(
+      guardians.map((g, i) => ({
+        account_id: accountId,
+        share_index: g.share_index,
+        token_hash: g.token_hash,
+        wrapped_cipher_text: g.wrapped.cipherText,
+        wrapped_iv: g.wrapped.iv,
+        guardian_email: g.guardian_email,
+        guardian_phone: g.guardian_phone,
+        guardian_line_link_code: lineLinkCodes[i],
+      }))
+    );
+    insertError = error;
+    // Postgres unique_violation — regenerate just the link codes (the
+    // share_index/token_hash uniqueness was already checked above) and
+    // retry the whole batch insert.
+    if (error && error.code === '23505') {
+      lineLinkCodes = guardians.map((g) => (g.want_line ? generateLinkCode() : null));
+      continue;
+    }
+    break;
+  }
 
   if (insertError) {
     console.error('guardian insert failed', insertError.message);
@@ -168,5 +206,9 @@ serve(async (req: Request) => {
     threshold_hours: thresholdHours,
     guardian_count: guardians.length,
     dms_heartbeat_at: nowIso,
+    // Keyed by share_index so the client can match each code back to the
+    // right guardian card on its reveal screen — null for any guardian
+    // who didn't request LINE linking.
+    line_link_codes: guardians.map((g, i) => ({ share_index: g.share_index, line_link_code: lineLinkCodes[i] })),
   });
 });
