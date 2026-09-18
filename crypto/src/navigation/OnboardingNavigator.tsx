@@ -5,6 +5,7 @@ import { OnboardingProvider } from '../screens/onboarding/OnboardingContext';
 import { WelcomeScreen } from '../screens/onboarding/WelcomeScreen';
 import { WarningScreen } from '../screens/onboarding/WarningScreen';
 import { RecoverScreen } from '../screens/onboarding/RecoverScreen';
+import { RedeemScreen } from '../screens/onboarding/RedeemScreen';
 import { PassphraseScreen } from '../screens/onboarding/PassphraseScreen';
 import { ConfirmScreen } from '../screens/onboarding/ConfirmScreen';
 import { SetPinScreen } from '../screens/onboarding/SetPinScreen';
@@ -22,6 +23,8 @@ export type OnboardingStackParamList = {
   Welcome: undefined;
   /** Real "กู้คืนด้วย 12 คำ" flow — reachable from Welcome and Unlock's forgot-PIN link. See RecoverScreen.tsx. */
   Recover: undefined;
+  /** Guardian-facing "use my recovery code" flow — reachable from Welcome only (a guardian, by definition, has no PIN/device lock for this room). See RedeemScreen.tsx. */
+  Redeem: undefined;
   Warning: undefined;
   Passphrase: undefined;
   Confirm: undefined;
@@ -72,6 +75,7 @@ export function OnboardingNavigator({ initialRouteName }: Props) {
       >
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="Recover" component={RecoverScreen} />
+        <Stack.Screen name="Redeem" component={RedeemScreen} />
         <Stack.Screen name="Unlock" component={UnlockScreen} />
         <Stack.Screen name="Warning" component={WarningScreen} />
         <Stack.Screen name="Passphrase" component={PassphraseScreen} />

@@ -77,6 +77,26 @@ const makeGuardianSlots = (): Guardian[] => Array.from({ length: MAX_GUARDIANS }
 interface RevealedGuardian {
   nickname: string;
   token: string;
+  shareIndex: number;
+  // Same value for every guardian in one setup batch — how many of them
+  // (including this one) must redeem before the room can actually be
+  // recovered. Bundled into the recovery code below so RedeemScreen.tsx
+  // knows whether an unwrapped value IS the master key (threshold 1) or
+  // just one Shamir share that still needs combining with others.
+  threshold: number;
+}
+
+/**
+ * Feedback (answering "การใช้กุญแจ ใช้ยังไง"): a guardian needs THREE
+ * pieces of information to redeem their share — account_id, share_index,
+ * and the token itself — and the old UI only ever showed the token,
+ * leaving the owner to somehow also communicate the other two. Bundling
+ * all of it into one copy-pasteable string removes that whole class of
+ * "I have the token but nothing else" support question. See
+ * RedeemScreen.tsx's parseRecoveryCode for the inverse operation.
+ */
+function buildRecoveryCode(accountId: string, g: RevealedGuardian): string {
+  return `${accountId}:${g.shareIndex}:${g.threshold}:${g.token}`;
 }
 
 export function DMSSetupScreen({ navigation, route }: Props) {
@@ -293,7 +313,14 @@ export function DMSSetupScreen({ navigation, route }: Props) {
         threshold: effectiveThreshold,
       });
 
-      setRevealed(names.map((nickname, i) => ({ nickname, token: tokens[i] })));
+      setRevealed(
+        names.map((nickname, i) => ({
+          nickname,
+          token: tokens[i],
+          shareIndex: rows[i].shareIndex,
+          threshold: effectiveThreshold,
+        }))
+      );
     } catch (err) {
       // Surface the real reason (e.g. the backend's own validation message)
       // instead of a generic string — a silent "try again" here is exactly
@@ -305,11 +332,11 @@ export function DMSSetupScreen({ navigation, route }: Props) {
     }
   };
 
-  const handleCopyToken = async (token: string) => {
-    await Clipboard.setStringAsync(token);
+  const handleCopyToken = async (code: string) => {
+    await Clipboard.setStringAsync(code);
     appAlert(
       'คัดลอกแล้ว',
-      'กรุณาจัดเก็บและจัดส่งรหัสกุญแจสำรองนี้ ให้ผู้ที่ท่านระบุชื่อ (ในหน้าที่แล้ว) เอง'
+      'กรุณาจัดเก็บและจัดส่งรหัสนี้ ให้ผู้ที่ท่านระบุชื่อ (ในหน้าที่แล้ว) เอง — รหัสนี้ใช้กับหน้า "ใช้รหัสกุญแจสำรอง" ในแอป (จากหน้าแรก)'
     );
   };
 
@@ -337,16 +364,19 @@ export function DMSSetupScreen({ navigation, route }: Props) {
               จึงควรส่งรหัสนี้ให้ตรงคนที่ตั้งใจไว้เท่านั้น และเก็บรักษาเหมือนกุญแจจริงชิ้นหนึ่ง
             </Text>
           </View>
-          {revealed.map((g, i) => (
-            <View key={g.nickname} style={styles.tokenCard}>
-              <Text style={styles.tokenNickname}>บุคคลที่คุณเชื่อถือ: {g.nickname}</Text>
-              <Text style={styles.tokenLabel}>รหัสกุญแจสำรอง {i + 1}</Text>
-              <Text style={styles.tokenValue} numberOfLines={2}>
-                {g.token}
-              </Text>
-              <PrimaryButton variant="secondary" label="คัดลอก" onPress={() => handleCopyToken(g.token)} />
-            </View>
-          ))}
+          {revealed.map((g, i) => {
+            const code = buildRecoveryCode(accountId, g);
+            return (
+              <View key={g.nickname} style={styles.tokenCard}>
+                <Text style={styles.tokenNickname}>บุคคลที่คุณเชื่อถือ: {g.nickname}</Text>
+                <Text style={styles.tokenLabel}>รหัสกุญแจสำรอง {i + 1}</Text>
+                <Text style={styles.tokenValue} numberOfLines={3}>
+                  {code}
+                </Text>
+                <PrimaryButton variant="secondary" label="คัดลอก" onPress={() => handleCopyToken(code)} />
+              </View>
+            );
+          })}
         </ScrollView>
         <PrimaryButton label="เสร็จสิ้น" onPress={finish} />
       </View>

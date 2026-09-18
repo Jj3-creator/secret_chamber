@@ -123,6 +123,51 @@ export async function setupDms(
   }
 }
 
+/** A guardian's own recovery code isn't eligible yet — thrown by requestGuardianShare. */
+export class NotEligibleError extends Error {
+  constructor(public eligibleAtIso: string | null) {
+    super('not_yet_eligible');
+  }
+}
+
+/** account_id/share_index/token didn't match anything — dms-request-share is deliberately vague about which. */
+export class ShareNotFoundError extends Error {
+  constructor() {
+    super('not_found');
+  }
+}
+
+export interface GuardianShareResult {
+  shareIndex: number;
+  wrapped: { cipherText: string; iv: string };
+}
+
+/**
+ * A guardian retrieves their own wrapped share once the account is
+ * actually eligible (server clock, not anything this call claims). Still
+ * ciphertext on return — see unwrapVaultKey (crypto.ts's
+ * deriveKeyDeterministic(token) derives the key that unwraps it). See
+ * dms-request-share/index.ts.
+ */
+export async function requestGuardianShare(accountId: string, shareIndex: number, token: string): Promise<GuardianShareResult> {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/dms-request-share`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account_id: accountId, share_index: shareIndex, token }),
+  });
+  const body = await res.json().catch(() => ({} as Record<string, unknown>));
+  if (res.status === 403 && body?.error === 'not_yet_eligible') {
+    throw new NotEligibleError(typeof body.eligible_at === 'string' ? body.eligible_at : null);
+  }
+  if (res.status === 404) {
+    throw new ShareNotFoundError();
+  }
+  if (!res.ok) {
+    throw new Error(`requestGuardianShare: ${res.status} ${body?.error ?? ''}`);
+  }
+  return { shareIndex: body.share_index as number, wrapped: body.wrapped as { cipherText: string; iv: string } };
+}
+
 export type ActivityEventType = 'upload' | 'heartbeat' | 'dms_setup';
 
 export interface ActivityLogEntry {

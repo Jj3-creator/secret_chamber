@@ -69,6 +69,16 @@ export function WelcomeScreen({ navigation }: Props) {
         >
           <Text style={styles.recoverLinkText}>กู้คืนด้วย 12 คำ</Text>
         </Pressable>
+        {/* Feedback: "การใช้กุญแจ ใช้ยังไง" — a guardian holding a recovery
+            code (given to them by a room owner, out-of-band) had no way
+            in the app to actually do anything with it. See RedeemScreen.tsx. */}
+        <Pressable
+          style={styles.recoverLink}
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('Redeem')}
+        >
+          <Text style={styles.recoverLinkText}>ได้รับรหัสกุญแจสำรองมา? ใช้ที่นี่</Text>
+        </Pressable>
         <Text style={styles.footnote}>ไม่เก็บอีเมล เบอร์โทร หรือข้อมูลระบุตัวตน</Text>
       </View>
     </View>

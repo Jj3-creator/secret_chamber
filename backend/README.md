@@ -292,11 +292,18 @@ supabase functions serve dms-request-share --env-file .env --no-verify-jwt
   and replaces that account's entire guardian set (see the comment in
   `dms-setup/index.ts`). Fine for "redo my DMS setup"; not something to call
   incidentally.
-- **No guardian-facing redemption screen yet**: `dms-notify`'s email tells
-  a guardian they can now use their recovery token, and `dms-request-share`
-  is real and deployed — but there's still no in-app screen for a guardian
-  to actually type in `account_id` + `share_index` + `token` and get their
-  unwrapped share. Build that before relying on this feature end-to-end.
+- **Guardian redemption screen** (`crypto/src/screens/onboarding/RedeemScreen.tsx`,
+  reachable from Welcome): a guardian pastes in the combined recovery code
+  DMSSetupScreen's reveal screen now generates (`account_id:share_index:
+  threshold:token`, one string instead of three separate pieces to
+  communicate) and this calls `dms-request-share` for them. Threshold 1 —
+  solo guardian, or "any one of N" — unwraps straight to the master key
+  and re-joins onboarding at SetPin, same as 12-word recovery. Threshold
+  >= 2 ("all must agree") only ever unwraps to ONE Shamir share per code;
+  the screen accumulates shares in memory across multiple pasted codes in
+  the same session until there are enough to combine — real coordination
+  between separate guardians on separate devices still has to happen
+  out-of-band, same as the codes themselves.
 - **No LINE notification**: see `dms-notify/index.ts`'s own header comment
   — LINE Notify (the only way to do this without a full Official Account +
   Messaging API integration) was shut down by LINE in March 2025.
