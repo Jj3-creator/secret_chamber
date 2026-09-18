@@ -28,7 +28,15 @@ interface GuardianInput {
   share_index: number;
   token_hash: string;
   wrapped: { cipherText: string; iv: string };
+  // Optional — see 0006_dms_notify.sql's own comment for the narrow
+  // "email only, never the token itself" trade-off this represents.
+  guardian_email: string | null;
 }
+
+// Loose but real validation — this only ever gates which address gets a
+// reminder email, never anything security-sensitive, so it doesn't need
+// to be a strict RFC 5322 parser.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function parseGuardian(raw: unknown): GuardianInput | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -36,6 +44,7 @@ function parseGuardian(raw: unknown): GuardianInput | null {
   const shareIndex = g.share_index;
   const tokenHash = g.token_hash;
   const wrapped = g.wrapped as Record<string, unknown> | null | undefined;
+  const emailRaw = g.guardian_email;
 
   if (typeof shareIndex !== 'number' || !Number.isInteger(shareIndex) || shareIndex < 1 || shareIndex > 255) {
     return null;
@@ -51,11 +60,13 @@ function parseGuardian(raw: unknown): GuardianInput | null {
   ) {
     return null;
   }
+  if (emailRaw != null && (typeof emailRaw !== 'string' || !EMAIL_RE.test(emailRaw))) return null;
 
   return {
     share_index: shareIndex,
     token_hash: tokenHash,
     wrapped: { cipherText: wrapped.cipherText, iv: wrapped.iv },
+    guardian_email: (emailRaw as string | null) ?? null,
   };
 }
 
@@ -138,6 +149,7 @@ serve(async (req: Request) => {
       token_hash: g.token_hash,
       wrapped_cipher_text: g.wrapped.cipherText,
       wrapped_iv: g.wrapped.iv,
+      guardian_email: g.guardian_email,
     }))
   );
 

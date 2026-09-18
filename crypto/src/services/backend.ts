@@ -90,6 +90,11 @@ export interface DmsGuardianInput {
   shareIndex: number;
   tokenHash: string;
   wrapped: { cipherText: string; iv: string };
+  // Optional — see backend/supabase/migrations/0006_dms_notify.sql for
+  // why this is the one piece of guardian identity the server now learns
+  // (only if the owner chose to type it in), and why it's still never the
+  // raw recovery token itself.
+  guardianEmail?: string | null;
 }
 
 /** Registers (or replaces) an account's Dead Man's Switch guardians + threshold. See dms-setup/index.ts. */
@@ -108,6 +113,7 @@ export async function setupDms(
         share_index: g.shareIndex,
         token_hash: g.tokenHash,
         wrapped: g.wrapped,
+        guardian_email: g.guardianEmail ?? null,
       })),
     }),
   });

@@ -14,7 +14,8 @@ backend/
 └── supabase/
     ├── migrations/
     │   ├── 0001_init_schema.sql     # accounts + blobs tables, RLS policies
-    │   └── 0002_dms_heartbeat.sql   # Dead Man's Switch heartbeat + guardian shares
+    │   ├── 0002_dms_heartbeat.sql   # Dead Man's Switch heartbeat + guardian shares
+    │   └── 0006_dms_notify.sql      # guardian_email + notified_at, for the email reminder below
     └── functions/
         ├── _shared/
         │   └── http.ts              # CORS/json/sha256 helpers (used by the dms-* functions)
@@ -30,8 +31,11 @@ backend/
         ├── dms-request-share/
         │   ├── index.ts             # a guardian retrieves their wrapped share, once eligible
         │   └── deno.json
-        └── cleanup-inactive-accounts/
-            ├── index.ts             # deletes accounts (+ R2 blobs) inactive > 1 year
+        ├── cleanup-inactive-accounts/
+        │   ├── index.ts             # deletes accounts (+ R2 blobs) inactive > 1 year
+        │   └── deno.json
+        └── dms-notify/
+            ├── index.ts             # emails eligible guardians a one-time reminder they can now use their token
             └── deno.json
 ```
 
@@ -47,7 +51,11 @@ backend/
   `vault.ts`'s `ShamirShare.index`), `token_hash` (SHA-256 of a random
   recovery token given to that guardian out-of-band), `wrapped_cipher_text`
   + `wrapped_iv` (the share, AES-256-GCM-wrapped client-side under a key
-  only that guardian can derive — the server never sees a usable share).
+  only that guardian can derive — the server never sees a usable share),
+  `guardian_email` (optional, owner-supplied — the one deliberate PII
+  exception, see 0006_dms_notify.sql) and `notified_at` (set once
+  dms-notify has emailed this guardian for the current eligibility
+  window).
 - RLS is enabled on all three tables. See the comment blocks in
   [`0001_init_schema.sql`](supabase/migrations/0001_init_schema.sql) and
   [`0002_dms_heartbeat.sql`](supabase/migrations/0002_dms_heartbeat.sql) for
@@ -56,15 +64,21 @@ backend/
   `dms_guardians` has no anon/authenticated policies at all — it's reachable
   only via `dms-setup` / `dms-request-share`.
 
-## Dead Man's Switch (DMS) — how the three functions fit together
+## Dead Man's Switch (DMS) — how the four functions fit together
 
 ```
 Owner, periodically:        POST dms-heartbeat  { account_id }
                              → pushes dms_heartbeat_at to now()
 
 Owner, once, at setup:      POST dms-setup      { account_id, threshold_hours,
-                                                   guardians: [{ share_index, token_hash, wrapped }, ...] }
-                             → stores the wrapped shares + starts the clock
+                                                   guardians: [{ share_index, token_hash, wrapped, guardian_email }, ...] }
+                             → stores the wrapped shares (+ optional email) + starts the clock
+
+Scheduled, e.g. hourly:     POST dms-notify     { }
+                             → for each account past its threshold, emails any
+                               still-unnotified guardian who gave an email:
+                               "you can use your recovery token now" — never
+                               the token itself, which this table never has
 
 Guardian, after silence:    POST dms-request-share { account_id, share_index, token }
                              → 403 not_yet_eligible  until  now() >= dms_heartbeat_at + dms_threshold_hours
@@ -128,6 +142,56 @@ curl -X POST "https://<project-ref>.supabase.co/functions/v1/cleanup-inactive-ac
   -d '{"dry_run": true}'
 ```
 
+## Auto-notify eligible guardians by email
+
+Feedback: "อยากให้ APP แจ้งเตือน id line และ อีเมล์เลยได้ไม๊" — real,
+scheduled email via [Resend](https://resend.com) (free tier: 100
+emails/day, no domain verification needed to start — Resend's own shared
+`onboarding@resend.dev` sender works immediately). See
+[`dms-notify`](supabase/functions/dms-notify/index.ts)'s own header
+comment for the full reasoning, especially why **LINE isn't included**
+(LINE Notify — the only way to message an arbitrary LINE user without
+them first friending a dedicated Official Account — was shut down by
+LINE in March 2025; real LINE delivery now needs a full Official Account
++ Messaging API integration, left for later) and why this is safe even
+though it's a new exception to "no PII server-side": the email is a
+*reminder* to use a token the guardian must already hold out-of-band —
+the raw token is never stored here, so a server compromise still can't
+recover anyone's vault from this table alone.
+
+Deploy it the same way as `cleanup-inactive-accounts` — **without**
+`--no-verify-jwt`, so only a `service_role`-authenticated caller can
+invoke it:
+
+```bash
+supabase functions deploy dms-notify
+```
+
+Set the Resend API key as a secret first (never committed, never sent to
+the client — the app itself never calls this function):
+
+```bash
+supabase secrets set RESEND_API_KEY=re_your_key_here
+```
+
+Then schedule it the same way: **Database → Cron Jobs → New Cron Job**,
+type "Edge Function", target `dms-notify`, schedule e.g. `0 * * * *`
+(hourly — more frequent than `cleanup-inactive-accounts` makes sense here
+since eligibility windows can be as short as a day).
+
+Smoke test before scheduling:
+
+```bash
+curl -X POST "https://<project-ref>.supabase.co/functions/v1/dms-notify" \
+  -H "Authorization: Bearer <service_role-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": true}'
+```
+
+Expect `{ dry_run: true, eligible_accounts, pending_guardians, notified: 0, results: [...] }` —
+read `pending_guardians`/`results` before ever running it for real (i.e.
+without `dry_run`), same caution as `cleanup-inactive-accounts`.
+
 ## Prerequisites
 
 ```bash
@@ -136,7 +200,9 @@ supabase login
 ```
 
 You'll also need a Cloudflare R2 bucket and an R2 API token (Account Home →
-R2 → Manage API Tokens) with Object Read & Write permissions on that bucket.
+R2 → Manage API Tokens) with Object Read & Write permissions on that bucket,
+and (only if deploying `dms-notify`) a free [Resend](https://resend.com)
+account + API key (Dashboard → API Keys → Create API Key).
 
 ## Deploy
 
@@ -162,6 +228,8 @@ R2 → Manage API Tokens) with Object Read & Write permissions on that bucket.
    cp .env.example .env
    # fill in R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
    supabase secrets set --env-file .env
+   # only if deploying dms-notify:
+   supabase secrets set RESEND_API_KEY=re_your_key_here
    ```
 
 4. **Deploy the functions.** Because this app has no Supabase Auth session
@@ -174,11 +242,12 @@ R2 → Manage API Tokens) with Object Read & Write permissions on that bucket.
    supabase functions deploy dms-heartbeat --no-verify-jwt
    supabase functions deploy dms-request-share --no-verify-jwt
    supabase functions deploy cleanup-inactive-accounts
+   supabase functions deploy dms-notify
    ```
 
-   (Note: `cleanup-inactive-accounts` is deployed *without* `--no-verify-jwt`
-   — see "Auto-delete after 1 year of inactivity" below for why, and for
-   the one-time Dashboard step to actually schedule it.)
+   (Note: `cleanup-inactive-accounts` and `dms-notify` are deployed
+   *without* `--no-verify-jwt` — see their own sections below for why,
+   and for the one-time Dashboard step to actually schedule each.)
 
 5. **Smoke test:**
 
@@ -223,11 +292,14 @@ supabase functions serve dms-request-share --env-file .env --no-verify-jwt
   and replaces that account's entire guardian set (see the comment in
   `dms-setup/index.ts`). Fine for "redo my DMS setup"; not something to call
   incidentally.
-- **No push/email/SMS to guardians**: this backend never contacts a
-  guardian on the owner's behalf — recovery tokens are handed over
-  out-of-band by the owner. Notifying guardians that they're now eligible
-  to request their share (rather than them polling `dms-request-share`)
-  isn't built.
+- **No guardian-facing redemption screen yet**: `dms-notify`'s email tells
+  a guardian they can now use their recovery token, and `dms-request-share`
+  is real and deployed — but there's still no in-app screen for a guardian
+  to actually type in `account_id` + `share_index` + `token` and get their
+  unwrapped share. Build that before relying on this feature end-to-end.
+- **No LINE notification**: see `dms-notify/index.ts`'s own header comment
+  — LINE Notify (the only way to do this without a full Official Account +
+  Messaging API integration) was shut down by LINE in March 2025.
 - **PDPA consent / liability-waiver copy is NOT legal advice**: the
   Warning screen's acknowledgment checkboxes (in `crypto/`) include draft
   wording about the 1-year auto-delete and data-handling consent. That

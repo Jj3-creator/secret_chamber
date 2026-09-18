@@ -225,6 +225,15 @@ export function DMSSetupScreen({ navigation, route }: Props) {
     // must agree). A single guardian makes the choice moot either way.
     const effectiveThreshold = names.length === 1 ? 1 : verifyMode === 'all' ? names.length : 1;
 
+    // Feedback: "อยากให้ APP แจ้งเตือน id line และ อีเมล์เลยได้ไม๊" —
+    // email only (see dms-notify/index.ts for why LINE isn't included),
+    // and only for guardians who actually gave one (already an optional
+    // field) AND only if the "แจ้งเตือน...เมื่อครบกำหนด" switch above is
+    // on — that switch is now this feature's real master control, not
+    // just a decorative preference, so turning it off means no address is
+    // sent to the server at all even if one was typed in.
+    const emails = notifyEnabled ? activeGuardians.map((g) => g.email.trim() || null) : activeGuardians.map(() => null);
+
     setSubmitting(true);
     try {
       const tokens = await Promise.all(names.map(() => generateRandomToken()));
@@ -250,6 +259,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                 shareIndex: i + 1,
                 tokenHash: sha256Hex(tokens[i]),
                 wrapped: await wrapVaultKey(masterKeyHex, guardianKeys[i].masterKeyHex),
+                guardianEmail: emails[i],
               }))
             )
           : await (async () => {
@@ -264,6 +274,7 @@ export function DMSSetupScreen({ navigation, route }: Props) {
                 shareIndex: s.index,
                 tokenHash: sha256Hex(tokens[i]),
                 wrapped: wrapped[i],
+                guardianEmail: emails[i],
               }));
             })();
 
@@ -476,7 +487,8 @@ export function DMSSetupScreen({ navigation, route }: Props) {
               <Switch value={notifyEnabled} onValueChange={setNotifyEnabled} />
             </View>
             <Text style={styles.notifyCaveat}>
-              (ฟีเจอร์นี้ยังไม่เปิดใช้งาน — อาจเปิดให้ใช้งานได้ในโอกาสถัดไป)
+              (ถ้าเปิดไว้ ระบบจะส่งอีเมลแจ้งเตือนให้บุคคลที่คุณเชื่อถือที่กรอกอีเมลไว้โดยอัตโนมัติเมื่อครบกำหนด — อีเมลนี้เป็นแค่การเตือนให้ใช้รหัสกุญแจสำรองที่คุณให้ไปแล้ว
+              ไม่ใช่การส่งรหัสกุญแจสำรองเอง ระบบไม่เคยเก็บรหัสกุญแจสำรองไว้ที่ server เลย — LINE ยังไม่รองรับการแจ้งเตือนอัตโนมัติในตอนนี้)
             </Text>
 
             <View style={styles.warnBox}>
@@ -488,11 +500,11 @@ export function DMSSetupScreen({ navigation, route }: Props) {
 
             <Text style={styles.fieldLabel}>บุคคลที่คุณเชื่อถือ ({MIN_GUARDIANS}-{MAX_GUARDIANS} คน)</Text>
             <Text style={styles.contactNote}>
-              (ระบบอัตโนมัติจะส่งรหัสกุญแจสำรองให้บุคคลเหล่านี้เมื่อคุณหายจากระบบเกินเวลาที่คุณกำหนด)
+              (ถ้าเปิด "แจ้งเตือน...เมื่อครบกำหนด" ด้านบนไว้ ระบบจะส่งอีเมลเตือนบุคคลเหล่านี้ให้ใช้รหัสกุญแจสำรองที่คุณให้ไปแล้ว — ไม่ใช่ส่งรหัสกุญแจสำรองเอง)
             </Text>
             <Text style={styles.contactNote}>
-              ช่องที่ 1 จำเป็นต้องใส่ — ช่องที่ 2 ไม่บังคับ เว้นว่างไว้ได้ถ้าไม่ต้องการ เก็บอีเมล/LINE ไว้ในเครื่องนี้เท่านั้น
-              (ไม่ส่งขึ้น server) — ใช้อีเมลหรือ LINE แทนเบอร์โทร เพราะเชื่อมต่อแจ้งเตือนได้โดยไม่มีค่าใช้จ่ายเมื่อฟีเจอร์นี้เปิดใช้งานในอนาคต
+              ช่องที่ 1 จำเป็นต้องใส่ — ช่องที่ 2 ไม่บังคับ เว้นว่างไว้ได้ถ้าไม่ต้องการ อีเมลที่กรอกจะถูกส่งขึ้น server เพื่อใช้แจ้งเตือนเท่านั้น (ถ้าเปิดใช้งาน) —
+              LINE ID ยังคงเก็บไว้ในเครื่องนี้เท่านั้น ไม่ส่งขึ้น server เพราะยังไม่รองรับการแจ้งเตือนผ่าน LINE
             </Text>
 
             {isReconfigure && (
