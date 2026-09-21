@@ -49,11 +49,12 @@ import { useVaultSession } from '../vault/VaultSessionContext';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'DMSSetup'>;
 
-// ⚠️ Placeholder — swap for the real LINE Official Account's Basic ID
-// (the "@xxxxx" LINE shows on its profile/QR page) once it exists. Shown
-// to the owner on the reveal screen so they know which OA to tell the
-// guardian to add as a friend before sending the link code.
-const LINE_OA_ADD_FRIEND_HINT = 'ยังไม่ได้ตั้งค่า — ดูใน LINE Official Account Manager';
+// The app's real LINE Official Account ("Secret Chamber", created via
+// LINE Official Account Manager + a linked Messaging API channel under
+// provider "jj5"). Shown to the owner on the reveal screen so they know
+// which OA to tell the guardian to add as a friend before sending the
+// link code.
+const LINE_OA_ADD_FRIEND_HINT = '@367fkuzw';
 
 const PERIOD_OPTIONS = [
   { label: '7 วัน', hours: 7 * 24 },

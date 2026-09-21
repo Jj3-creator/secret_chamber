@@ -8,7 +8,9 @@
  *
  * Pipeline:
  *   passphrase (BIP-39, 12 words)
- *     -> deriveMasterKey()   [Argon2id, falls back to PBKDF2-HMAC-SHA256]
+ *     -> deriveMasterKey()   [PBKDF2-HMAC-SHA256 — see its own `allowArgon2id`
+ *                             param doc for why the once-planned Argon2id
+ *                             path is now disabled by default everywhere]
  *     -> deriveAccountId()   [SHA-256(masterKey), safe to send to server]
  *     -> encryptData() / decryptData()  [AES-256-GCM, fresh 96-bit IV each call]
  *
@@ -29,7 +31,7 @@ import * as ExpoCrypto from 'expo-crypto';
 import { Buffer } from 'buffer';
 import * as bip39 from 'bip39';
 import { sha256 } from '@noble/hashes/sha256';
-import { pbkdf2 } from '@noble/hashes/pbkdf2';
+import { pbkdf2Async } from '@noble/hashes/pbkdf2';
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils';
 import { gcm } from '@noble/ciphers/aes';
 import { THAI_WORDLIST } from './wordlists/thai';
@@ -147,8 +149,15 @@ export async function generatePassphrase(language: PassphraseLanguage = 'en'): P
 /**
  * Tries native Argon2id via `react-native-argon2`. Returns null (never
  * throws) if the package isn't installed or its native binding isn't
- * available on the current runtime (e.g. Expo Go without a dev client) —
- * the caller falls back to PBKDF2 in that case.
+ * available on the current runtime — the caller falls back to PBKDF2 in
+ * that case. As of the fix in deriveMasterKey's `allowArgon2id` doc,
+ * `react-native-argon2` has been removed from package.json entirely (a
+ * real EAS-built APK crashed during PIN setup, the one code path that
+ * actually let this run instead of no-op'ing like it always did on web/
+ * Expo Go), so this `require()` now always throws "module not found" and
+ * this function always returns null — left in place, inert, rather than
+ * deleted outright, in case Argon2id support is revisited later with a
+ * fixed/replacement library.
  */
 async function tryArgon2id(
   passphrase: string,
@@ -237,14 +246,38 @@ export async function deriveKeyDeterministic(secret: string): Promise<MasterKeyR
 export async function deriveMasterKey(
   passphrase: string,
   existingSaltHex?: string,
-  // PIN derivation (derivePinKey, via plain deriveMasterKey calls) stays
-  // per-device by design already — a PIN set on one device is never
-  // expected to unlock a different one — so letting THAT path use
-  // whichever KDF is available (Argon2id when a real native build can
-  // load it, PBKDF2 otherwise) is fine, and arguably a nice security
-  // bonus where it's available. Only deriveKeyDeterministic needs this
-  // pinned to false, for the cross-platform reason explained there.
-  allowArgon2id = true
+  // Two real bugs found via a real EAS-built Android APK (neither
+  // reproducible on web/Expo Go, where they were both invisible all
+  // session):
+  //
+  // 1. THE MAIN CAUSE (see the pbkdf2 -> pbkdf2Async switch below): the
+  //    old @noble/hashes `pbkdf2()` call is fully synchronous — on a real
+  //    device its 120,000 SHA-256 iterations blocked the JS thread for
+  //    ~20 real seconds (reported: ConfirmScreen's "ยืนยัน" button
+  //    visibly hung that long before advancing). On the very next screen
+  //    (SetPin, which derives a SECOND key — for the PIN — the same
+  //    blocking way), that block is long enough to plausibly trip
+  //    Android's ANR ("app not responding") watchdog, which can kill and
+  //    restart the whole process — reported: after confirming the PIN,
+  //    the app "pushed back" to the very first screen, consistent with a
+  //    fresh process start (no error, no handled navigation, everything
+  //    reset). Switching to `pbkdf2Async` (yields back to the event loop
+  //    every `asyncTick` ms instead of running one uninterrupted loop)
+  //    fixes both: the UI stays responsive throughout, and the JS thread
+  //    is never blocked long enough to look "not responding."
+  //
+  // 2. A second, independent risk in the same area: derivePinKey
+  //    (vault.ts) called this with the old default of `true` here, and
+  //    react-native-argon2 — a real native module, genuinely unable to
+  //    load on web/Expo Go all session, but real Android/iOS code that
+  //    WOULD load on an actual device — was still a live dependency.
+  //    Whether or not it actually contributed to the crash above,
+  //    there's no upside to letting it run: a PIN is low-entropy,
+  //    device-local, rate-limit-able input where Argon2id's extra cost
+  //    buys little, and the package has since been removed from
+  //    package.json entirely (tryArgon2id's own comment) — so this stays
+  //    `false` and is effectively permanent, not just a default.
+  allowArgon2id = false
 ): Promise<MasterKeyResult> {
   const salt = existingSaltHex
     ? hexToBytes(existingSaltHex)
@@ -260,7 +293,16 @@ export async function deriveMasterKey(
       return { masterKeyHex: bytesToHex(masterKey), saltHex: bytesToHex(salt), kdf: 'argon2id' };
     }
 
-    masterKey = pbkdf2(sha256, passphraseBytes, salt, {
+    // Async, not the plain sync `pbkdf2` — see this function's own
+    // `allowArgon2id` doc (point 1) for why: the sync version blocks the
+    // JS thread for the entire ~120k-iteration loop in one go, which is
+    // fine on a fast desktop JS engine (all of this session's web
+    // testing) but measured at ~20 real seconds on an actual Android
+    // device — long enough to freeze the UI and risk an ANR-triggered
+    // process kill. pbkdf2Async yields back to the event loop every few
+    // ms, keeping the exact same iteration count/security level while
+    // never blocking long enough to look unresponsive.
+    masterKey = await pbkdf2Async(sha256, passphraseBytes, salt, {
       c: Math.max(PBKDF2_ITERATIONS, PBKDF2_MIN_ITERATIONS),
       dkLen: KEY_BYTES,
     });
