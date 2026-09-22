@@ -372,7 +372,7 @@ export function CategoryDetailScreen({ route, navigation }: Props) {
             {loading ? null : !guardians || guardians.guardians.length === 0 ? (
               <View style={styles.noteBox}>
                 <Text style={styles.noteText}>
-                  ยังไม่ได้ตั้งค่าผู้ถือกุญแจสำรอง — ตั้งค่าได้ตอนสร้างห้อง (ขั้นตอน "กุญแจไขความลับสำหรับทายาท")
+                  ยังไม่ได้ตั้งค่าผู้ถือกุญแจสำรอง — ตั้งค่าได้ตอนสร้างห้อง (ขั้นตอน "ตั้งกุญแจสำหรับบุคคลที่คุณไว้ใจ")
                   ก่อนถึงจะเลือกได้ว่าใครเข้าถึงตู้เซฟไหนได้บ้าง
                 </Text>
               </View>

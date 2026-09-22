@@ -52,7 +52,7 @@ function formatThaiDateTime(iso: string): string {
 
 function describeDms(status: AccountStatus): string {
   if (status.dmsThresholdHours == null || status.dmsHeartbeatAt == null) {
-    return 'ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท';
+    return 'ยังไม่ได้ตั้งกุญแจสำหรับบุคคลที่คุณไว้ใจ';
   }
   const eligibleAtMs = new Date(status.dmsHeartbeatAt).getTime() + status.dmsThresholdHours * 60 * 60 * 1000;
   const msRemaining = eligibleAtMs - Date.now();
@@ -188,7 +188,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Avatar size={40} />
+          <Avatar size={40} color={accentColor} />
           <Text style={[styles.title, { fontSize: scaled(20) }]}>
             {roomNickname ? (
               <>
@@ -260,7 +260,7 @@ export function VaultHomeScreen({ route, navigation }: Props) {
               )}
               {!dmsConfigured && (
                 <Text style={styles.dmsHint}>
-                  ยังไม่ได้ตั้งค่ากุญแจไขความลับสำหรับทายาท — แต่การเข้าห้องยังนับเป็นการยืนยันตัวตนเพื่อไม่ให้ห้องถูกลบอัตโนมัติเช่นเดิม
+                  ยังไม่ได้ตั้งกุญแจสำหรับบุคคลที่คุณไว้ใจ — แต่การเข้าห้องยังนับเป็นการยืนยันตัวตนเพื่อไม่ให้ห้องถูกลบอัตโนมัติเช่นเดิม
                 </Text>
               )}
             </View>

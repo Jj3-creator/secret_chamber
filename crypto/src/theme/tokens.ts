@@ -1,9 +1,21 @@
 /**
- * tokens.ts — shared design tokens for the Onboarding flow
+ * tokens.ts — shared design tokens for the whole app
  * ===========================================================
- * Matches the "Secret Chamber Flow" Claude Design canvas: 360×760 mobile,
- * dark neutral palette, no bright brand color (intentionally styled to
- * read like a plain file-storage utility, not an obviously "secret" app).
+ * Palette: "Graphite & Brass" — from the Sep 2026 mobile redesign handoff
+ * (design_handoff_secret_chamber/README.md §4.1), a single warm dark
+ * palette replacing the earlier plain-neutral one. Still deliberately
+ * understated (no bright/saturated brand color, low visual "this is a
+ * secret vault" signal at a glance) — just warmer and with one consistent
+ * brass accent instead of a flat cream one.
+ *
+ * Deliberate deviation from the handoff doc: its own type scale (21/18/
+ * 16/14.5.../9.5) is NOT used here. This app's base sizes were
+ * specifically bumped to a 16px floor earlier per direct feedback ("text
+ * was too small/low-contrast for older users to read comfortably") —
+ * that accessibility requirement outranks the redesign's smaller
+ * reference sizes, so only color/radius/shadow values were adopted, not
+ * type size. Per-screen explicit fontSize overrides (very common
+ * throughout this codebase) are unaffected either way.
  */
 import { Platform, type TextStyle } from 'react-native';
 
@@ -18,25 +30,35 @@ const webTextWrapFix = (
 ) as TextStyle;
 
 export const colors = {
-  background: '#0B0B0D',
-  surface: '#17171B',
-  surfaceAlt: '#1F1F24',
-  // Feedback: borders (checkbox boxes especially) were nearly invisible
-  // against the near-black background — too low-contrast to notice,
-  // let alone for an older user to read reliably. Brightened from #2A2A30.
-  border: '#48484F',
-  textPrimary: '#F2F2F0',
-  textSecondary: '#9B9BA3',
-  // Brightened from #6B6B75 for the same reason — "muted" shouldn't mean
-  // "hard to read" for hint/caption text that still carries real content.
-  textMuted: '#94949E',
-  accent: '#E7E5DF',
-  accentText: '#111114',
-  /** Muted teal — used for status/progress indicators (storage bar, DMS check-in), sampled from the design canvas export. */
-  accentTeal: '#7FA6B1',
-  danger: '#3A1518',
-  dangerBorder: '#5C2228',
-  dangerText: '#F3B7BB',
+  background: '#100F0D',
+  surface: '#1A1917',
+  // Buttons/list-items-within-sheets/thumbnails — the handoff's "surface2".
+  // Kept as the existing `surfaceAlt` key so no call site needs touching.
+  surfaceAlt: '#242320',
+  /** Hairline card borders — the handoff's "borderSoft". */
+  borderSoft: '#302E2A',
+  // Feedback (still true under the new palette): borders need to stay
+  // clearly visible against a near-black background for older users —
+  // this is the stronger border, for inputs/secondary buttons/handles.
+  border: '#4A4842',
+  textPrimary: '#F5F2EC',
+  textSecondary: '#B4AFA4',
+  textMuted: '#9A958A',
+  /** Single brand accent — buttons, tile numbers, active status. Never for body text color (handoff rule). */
+  accent: '#D9A441',
+  accentText: '#1A1400',
+  /** Deep end of the accent gradient (progress bar fill, button gradients). */
+  accentDeep: '#B98436',
+  // accentTeal used to be a distinct muted teal for status/progress
+  // indicators; the redesign consolidates to one accent everywhere, so
+  // this now just aliases `accent` rather than every call site needing
+  // to be found and rewritten.
+  accentTeal: '#D9A441',
+  /** Guardian-assigned safes, "encrypted"/confirmed states. */
+  success: '#8FB98A',
+  danger: '#2B1216',
+  dangerBorder: '#4A2228',
+  dangerText: '#FFA9A6',
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
@@ -44,7 +66,8 @@ export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as cons
 // Feedback: text was too small/low-contrast for older users to read
 // comfortably — bumped every base size to at least 16px (system font,
 // no license concerns). Screens that explicitly overrode a smaller size
-// were bumped the same way at their own call sites.
+// were bumped the same way at their own call sites. (Kept as-is under
+// the new palette — see this file's own header comment.)
 export const typography: Record<string, TextStyle> = {
   title: { fontSize: 28, fontWeight: '700', ...webTextWrapFix },
   subtitle: { fontSize: 16, fontWeight: '400', lineHeight: 23, ...webTextWrapFix },

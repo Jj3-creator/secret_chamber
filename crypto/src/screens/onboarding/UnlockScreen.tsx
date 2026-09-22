@@ -96,6 +96,9 @@ export function UnlockScreen({ navigation }: Props) {
   }
 
   const Avatar = getAvatarComponent(avatarId);
+  // Glyph tinted to the room's own accent (5 selectable room themes), not
+  // the fixed brand brass — matches how the nickname/tiles already pick up
+  // the room's live accentColor elsewhere in this app.
   const roomTitle = nickname ? `ห้องลับของ${nickname}` : 'ห้องลับของคุณ';
 
   return (
@@ -107,7 +110,7 @@ export function UnlockScreen({ navigation }: Props) {
               short) but cheap insurance against the same bug class. */}
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.header}>
-              <Avatar size={64} />
+              <Avatar size={64} color={accentColor} />
               <Text style={styles.title}>{roomTitle}</Text>
               <Text style={styles.subtitle}>ใส่ PIN เพื่อปลดล็อก</Text>
             </View>

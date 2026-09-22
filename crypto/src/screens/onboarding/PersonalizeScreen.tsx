@@ -8,7 +8,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { ThemedBackground } from '../../components/ThemedBackground';
-import { AVATAR_OPTIONS } from '../../components/avatars';
+import { AVATAR_OPTIONS, AVATAR_UNSELECTED_COLOR } from '../../components/avatars';
 import { ROOM_THEMES } from '../../theme/roomThemes';
 import { colors, spacing, typography } from '../../theme/tokens';
 import { saveRoomProfile } from '../../services/localProfile';
@@ -66,7 +66,7 @@ export function PersonalizeScreen({ navigation, route }: Props) {
         </Text>
 
         <View style={styles.previewCard}>
-          <PreviewAvatar size={56} />
+          <PreviewAvatar size={56} color={accentColor} />
           <Text style={styles.previewText}>ห้องลับของ{displayName}</Text>
         </View>
 
@@ -90,9 +90,16 @@ export function PersonalizeScreen({ navigation, route }: Props) {
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 onPress={() => setAvatarId(id)}
-                style={[styles.avatarCell, active && { borderColor: accentColor, backgroundColor: `${accentColor}1F` }]}
+                style={[
+                  styles.avatarCell,
+                  active && {
+                    borderWidth: 2,
+                    borderColor: accentColor,
+                    backgroundColor: `${accentColor}1F`,
+                  },
+                ]}
               >
-                <Component size={40} />
+                <Component size={40} color={active ? accentColor : AVATAR_UNSELECTED_COLOR} />
                 <Text style={styles.avatarLabel}>{label}</Text>
               </Pressable>
             );
