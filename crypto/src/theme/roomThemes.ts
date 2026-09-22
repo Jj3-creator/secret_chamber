@@ -10,6 +10,16 @@
  * earlier pass used ~6% lightness here, which looked identical to
  * colors.background on a real screen — feedback: users couldn't tell the
  * background had changed at all).
+ *
+ * Rebuilt for the "Graphite & Brass" redesign (tokens.ts) — the old set
+ * here was a leftover flat/muted-pastel palette from before that pass,
+ * so every themed screen (VaultHome, Unlock, Dashboard, Settings,
+ * Personalize — anything wrapped in ThemedBackground) still looked like
+ * the old app even after tokens.ts shipped, since none of them read
+ * tokens.colors directly. These 5 are richer, warmer jewel tones that
+ * actually sit well against the new near-black base instead of clashing
+ * with it, and the first one doubles as the exact brass accent used
+ * everywhere else in the app.
  */
 export interface RoomTheme {
   id: string;
@@ -21,11 +31,11 @@ export interface RoomTheme {
 }
 
 export const ROOM_THEMES: RoomTheme[] = [
-  { id: 'teal', label: 'ฟ้าอมเขียว', color: '#7FA6B1', background: '#14282C' },
-  { id: 'amber', label: 'อำพัน', color: '#C9975B', background: '#2A2013' },
-  { id: 'sage', label: 'เขียวเซจ', color: '#8FA87F', background: '#1C2814' },
-  { id: 'rose', label: 'กุหลาบฝุ่น', color: '#B98A93', background: '#2A1620' },
-  { id: 'slate', label: 'น้ำเงินหม่น', color: '#7C8AA6', background: '#16202C' },
+  { id: 'brass', label: 'ทองบรอนซ์', color: '#D9A441', background: '#211907' },
+  { id: 'copper', label: 'ทองแดง', color: '#C97B4A', background: '#241407' },
+  { id: 'emerald', label: 'มรกต', color: '#4FA692', background: '#0E211D' },
+  { id: 'wine', label: 'ไวน์แดง', color: '#B15C6B', background: '#241019' },
+  { id: 'indigo', label: 'คราม', color: '#7A8BD8', background: '#141830' },
 ];
 
 export const DEFAULT_ROOM_THEME_ID = ROOM_THEMES[0].id;
